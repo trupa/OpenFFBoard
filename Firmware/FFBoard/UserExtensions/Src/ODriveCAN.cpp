@@ -417,7 +417,7 @@ void ODriveCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxH
 		break;
 	}
 
-	case 0x17: // voltage
+	case 0x17: // voltageA
 	{
 		lastVoltageUpdate = HAL_GetTick();
 		uint64_t t = msg & 0xffffffff;

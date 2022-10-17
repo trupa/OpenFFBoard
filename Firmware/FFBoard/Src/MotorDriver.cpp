@@ -13,6 +13,8 @@
 #include "MotorPWM.h"
 #include "VescCAN.h"
 #include "MotorSimplemotion.h"
+#include "RmdCAN.h"
+
 
 ClassIdentifier MotorDriver::info ={.name = "None" , .id=CLSID_MOT_NONE, .visibility = ClassVisibility::visible};
 
@@ -46,6 +48,11 @@ const std::vector<class_entry<MotorDriver>> MotorDriver::all_drivers =
 	add_class<MotorSimplemotion1,MotorDriver>(9),
 	add_class<MotorSimplemotion2,MotorDriver>(10),
 #endif
+#ifdef RMD
+	add_class<RmdCAN1,MotorDriver>(11),
+	add_class<RmdCAN2,MotorDriver>(12),
+#endif
+
 };
 
 /**
