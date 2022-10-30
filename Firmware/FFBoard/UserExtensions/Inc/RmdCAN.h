@@ -25,6 +25,15 @@
 
 /*              ***** Data *****             */
 
+enum class RmdPIDSettings : uint8_t {
+    CurrentKp = 0x19, // Current Kp
+    CurrentKi = 0x19, // Current Ki
+    SpeedKp = 0x09, // Speed Kp
+    SpeedKi = 0x09, // Speed Ki
+    PositionKp = 0x19, // Position Kp
+    PositionKi = 0x19, // Position Ki
+};
+
 enum class RmdControlMode : uint8_t {
     idle = 0x00,
     current_loop = 0x01,
@@ -65,6 +74,7 @@ enum class RmdError : uint16_t {
 
 enum class RmdCmd : uint8_t
 {
+    none  = 0x00,
     /* */
     // Simple commands to place in first position in the uint8_t[8] buffer of a can messsage. These trigger
     // A simple reaction or reply
@@ -86,7 +96,7 @@ enum class RmdCmd : uint8_t
 
 // Internal commands
 enum class RmdCAN_commands : uint32_t{
-    canid,canspd,error,state,maxtorque,connected,voltage
+    canid,canspd,error,state,maxtorque,connected,voltage,encoderposition
 };
 
 
@@ -124,6 +134,7 @@ public:
     void motorOff();
     void setTorque(float torque);
     void readyCb();
+    void resetPID();
 
     void setMode(RmdControlMode controlMode);
 

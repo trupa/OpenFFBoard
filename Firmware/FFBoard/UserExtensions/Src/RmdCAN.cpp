@@ -87,6 +87,7 @@ void RmdCAN::registerCommands(){
 	registerCommand("maxtorque", RmdCAN_commands::maxtorque, "Max torque to send for scaling",CMDFLAG_GET | CMDFLAG_SET);
 	registerCommand("connected", RmdCAN_commands::connected, "Rmd connection state",CMDFLAG_GET);
 	registerCommand("voltage", RmdCAN_commands::voltage, "Rmd voltage",CMDFLAG_GET);
+	registerCommand("encoderposition", RmdCAN_commands::encoderposition, "Rmd encoderpositon",CMDFLAG_GET);
 
 }
 
@@ -213,6 +214,20 @@ bool RmdCAN::motorReady(){
 		return false;
 }
 
+void RmdCAN::resetPID() {
+    uint8_t data[8];
+    data[0] = 0x32; // Command
+    data[1] = 0x00; // Null
+    data[2] = (uint8_t)RmdPIDSettings::CurrentKp; // Current Kp
+    data[3] = (uint8_t)RmdPIDSettings::CurrentKi; // Current Ki
+    data[4] = (uint8_t)RmdPIDSettings::SpeedKp; // Speed Kp
+    data[5] = (uint8_t)RmdPIDSettings::SpeedKi; // Speed Ki
+    data[6] = (uint8_t)RmdPIDSettings::PositionKp; // Position Kp
+    data[7] = (uint8_t)RmdPIDSettings::PositionKi; // Position Ki
+
+	this->sendMsg(data);
+}
+
 
 /*                          CAN                            */
 
@@ -224,18 +239,21 @@ void RmdCAN::sendCmd(RmdCmd cmd){
 
 void RmdCAN::sendMsg(uint8_t *buffer){
 	CAN_tx_msg msg;
-    memcpy(&msg.data, buffer, 8);
-	msg.header.RTR = CAN_RTR_REMOTE;
-	msg.header.DLC = 0;
+
+	msg.header.RTR = CAN_RTR_DATA;
+	msg.header.DLC = 8;
+	msg.header.IDE = 0;
 	msg.header.StdId = outgoing_base_id + motorId + 1;
+    memcpy(&msg.data, buffer, 8);
+
 	port->sendMessage(msg);
+
 }
 
 
 /*						Direct CANBus incoming messages					*/
 
 void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHeaderTypeDef* rxHeader,uint32_t fifo){
-	
 	uint16_t node = rxHeader->StdId - incoming_base_id - 1;
 
 	if(node != this->motorId){
@@ -389,6 +407,12 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 	case RmdCAN_commands::connected:
 		if(cmd.type == CMDtype::get){
 			replies.emplace_back(connected ? 1 : 0);
+		}
+		break;
+
+	case RmdCAN_commands::encoderposition:
+		if(cmd.type == CMDtype::get) {
+			replies.emplace_back((uint32_t)this->lastPos);
 		}
 		break;
 
