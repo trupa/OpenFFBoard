@@ -284,13 +284,12 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			break;
 		}
 
-		case RmdCmd::read_multiturn_position: // encoder pos float
+		case RmdCmd::read_multiturn_angle: // encoder pos float
 		{
 			float out = (float)buffer_get_int32(buffer, 4);
 			memcpy(&lastPos,&out,sizeof(float));
 			break;
 		}
-
 
 		default:
 			break;
@@ -317,7 +316,7 @@ void RmdCAN::setPos(int32_t pos){
 
 float RmdCAN::getPos_f(){
 	if(this->connected)
-		sendCmd(RmdCmd::read_multiturn_position);
+		sendCmd(RmdCmd::read_multiturn_angle);
 	return lastPos-posOffset;
 }   
 
@@ -326,7 +325,7 @@ int32_t RmdCAN::getPos(){
 }
 
 uint32_t RmdCAN::getCpr(){
-	return 0xffff;
+	return 36000;//0xffff;
 }
 
 
@@ -349,7 +348,11 @@ void RmdCAN::setTorque(float torque){
 	{
 		uint8_t buffer[8] = {0};
 		buffer[0] = (uint8_t)RmdCmd::torque_closed_loop;
-		int16_t output_torque  = (int16_t)((base_amps * 100)*torque);
+		int16_t output_torque;
+		if (torque == 0.0)
+			output_torque = 0;
+		else
+			output_torque  = (int16_t)(100*torque);
 		buffer_append_int16(buffer, output_torque, 4);
 		sendMsg(buffer);
 	}

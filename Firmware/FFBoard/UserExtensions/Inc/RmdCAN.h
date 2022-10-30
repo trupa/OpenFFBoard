@@ -161,7 +161,6 @@ private:
     int32_t filterId = 0;
     bool connected = false;
 
-    float base_amps = 10; // in amps, 1 Amp base unit, must be sent as 0.01a out to the motors, so must be *100
     float maxTorque = 1.0; // range how to scale the torque output
     bool active = false;
 
