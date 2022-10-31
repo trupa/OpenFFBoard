@@ -244,7 +244,7 @@ void RmdCAN::sendMsg(uint8_t *buffer){
 	msg.header.DLC = 8;
 	msg.header.IDE = 0;
 	msg.header.StdId = outgoing_base_id + motorId + 1;
-    memcpy(&msg.data, buffer, 8);
+    memcpy(&msg.data, buffer, 8*sizeof(uint8_t));
 
 	port->sendMessage(msg);
 
@@ -262,7 +262,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 	RmdCmd cmd = (RmdCmd)rxBuf[0];
 
 	uint8_t buffer[8];
-	memcpy(buffer,rxBuf,8);
+	memcpy(buffer,rxBuf,8*sizeof(uint8_t));
 
 	lastCanMessage = HAL_GetTick();
 
