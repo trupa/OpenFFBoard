@@ -172,7 +172,7 @@ void RmdCAN::Run(){
 		}
 
 		if(HAL_GetTick() - lastCanMessage > 500){
-			this->sendCmd(RmdCmd::read_multiturn_angle);
+			this->sendCmd(RmdCmd::read_multiturn_position);
 			this->sendCmd(RmdCmd::read_status_1);
 		}
 
@@ -289,10 +289,9 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			break;
 		}
 
-		case RmdCmd::read_multiturn_angle: // encoder pos float
+		case RmdCmd::read_multiturn_position: // encoder pos float
 		{
-			float out = (float)buffer_get_int32(buffer, 4);
-			memcpy(&lastPos,&out,sizeof(float));
+			this->lastPos = (float)buffer_get_int32(buffer, 4);///100;
 			break;
 		}
 
@@ -321,7 +320,7 @@ void RmdCAN::setPos(int32_t pos){
 
 float RmdCAN::getPos_f(){
 	if(this->connected)
-		sendCmd(RmdCmd::read_multiturn_angle);
+		sendCmd(RmdCmd::read_multiturn_position);
 	return lastPos-posOffset;
 }   
 
@@ -330,7 +329,7 @@ int32_t RmdCAN::getPos(){
 }
 
 uint32_t RmdCAN::getCpr(){
-	return 36000;//0xffff;
+	return 0x3FFFF;
 }
 
 
