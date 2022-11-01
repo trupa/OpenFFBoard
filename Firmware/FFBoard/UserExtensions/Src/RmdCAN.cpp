@@ -264,34 +264,26 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 	if(node != this->motorId){
 		return;
 	}
-	RmdCmd cmd = (RmdCmd)rxBuf[0];
-
-	uint8_t buffer[8];
-	memcpy(buffer,rxBuf,8*sizeof(uint8_t));
+	RmdCmd cmd = static_cast<RmdCmd>(rxBuf[0]);
 
 	lastCanMessage = HAL_GetTick();
 
 	switch(cmd){
 		case RmdCmd::read_status_1:
 		{
-			RmdError error = (RmdError)buffer_get_uint16(buffer, 6);
-
-			if (error != RmdError::none)
+			this->motor_error = static_cast<RmdError>(buffer_get_uint16(rxBuf, 6));
+			if (motor_error != RmdError::none)
 			{
-				motor_error = error;
 				state =RmdLocalState::IDLE;
 			}
-
 			lastVoltageUpdate = HAL_GetTick();
-			float voltage =	((float)buffer_get_uint16(buffer, 4))/10;
-			memcpy(&lastVoltage,&voltage,sizeof(float));
-
+			this->lastVoltage =	(float)buffer_get_uint16(rxBuf, 4);
 			break;
 		}
 
 		case RmdCmd::read_multiturn_position: // encoder pos float
 		{
-			this->lastPos = (float)buffer_get_int32(buffer, 4);///100;
+			this->lastPos = (float)buffer_get_int32(rxBuf, 4);///100;
 			break;
 		}
 
@@ -329,7 +321,7 @@ int32_t RmdCAN::getPos(){
 }
 
 uint32_t RmdCAN::getCpr(){
-	return 0x3FFFF;
+	return 16384;
 }
 
 
