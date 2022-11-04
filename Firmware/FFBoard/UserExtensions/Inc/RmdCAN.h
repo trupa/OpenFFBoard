@@ -96,8 +96,19 @@ enum class RmdCmd : uint8_t
 
 // Internal commands
 enum class RmdCAN_commands : uint32_t{
-    canid,canspd,error,state,maxtorque,connected,voltage,encoderposition
+    canid,canspd,error,state,maxtorque,connected,voltage,encoderposition,debug
 };
+
+// DEBUG START
+struct RmdDebug
+{
+    uint32_t lastOutAddress;
+    uint32_t lastInAddress;
+    uint8_t lastInCmd;
+    uint8_t lastOutCmd;
+};
+// DEBUG STOP
+
 
 
 /*                    Main Class                              */
@@ -171,6 +182,10 @@ private:
     volatile uint32_t rmdMotorFlags = 0;
     volatile uint32_t rmdEncoderFlags = 0;
     volatile uint32_t rmdControllerFlags = 0;
+
+	// DEBUG START
+    RmdDebug _debug;
+	// DEBUG STOP
 
 };
 

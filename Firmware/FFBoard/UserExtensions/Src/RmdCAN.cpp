@@ -87,8 +87,10 @@ void RmdCAN::registerCommands(){
 	registerCommand("maxtorque", RmdCAN_commands::maxtorque, "Max torque to send for scaling",CMDFLAG_GET | CMDFLAG_SET);
 	registerCommand("connected", RmdCAN_commands::connected, "Rmd connection state",CMDFLAG_GET);
 	registerCommand("voltage", RmdCAN_commands::voltage, "Rmd voltage",CMDFLAG_GET);
-	registerCommand("encoderposition", RmdCAN_commands::encoderposition, "Rmd encoderpositon",CMDFLAG_GET);
-
+	registerCommand("epos", RmdCAN_commands::encoderposition, "Rmd encoderpositon",CMDFLAG_GET);
+	// DEBUG START
+	registerCommand("debug", RmdCAN_commands::debug, "debugging_data",CMDFLAG_GET);
+	// DEBUG STOP
 }
 
 void RmdCAN::restoreFlash(){
@@ -251,6 +253,11 @@ void RmdCAN::sendMsg(uint8_t *buffer){
 	msg.header.StdId = outgoing_base_id + motorId + 1;
     memcpy(&msg.data, buffer, 8*sizeof(uint8_t));
 
+	// DEBUG START
+	this->_debug.lastOutCmd = buffer[0];
+	this->_debug.lastOutAddress = msg.header.StdId;
+	// DEBUG STOP
+
 	port->sendMessage(msg);
 
 }
@@ -259,6 +266,11 @@ void RmdCAN::sendMsg(uint8_t *buffer){
 /*						Direct CANBus incoming messages					*/
 
 void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHeaderTypeDef* rxHeader,uint32_t fifo){
+	// DEBUG START
+	this->_debug.lastInAddress = rxHeader->StdId;
+	this->_debug.lastInCmd = rxBuf[0];
+	// DEBUG STOP
+
 	uint16_t node = rxHeader->StdId - incoming_base_id - 1;
 
 	if(node != this->motorId){
@@ -414,6 +426,17 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 			replies.emplace_back((uint32_t)this->lastPos);
 		}
 		break;
+
+	// DEBUG START
+	case RmdCAN_commands::debug:
+		if(cmd.type == CMDtype::get) {
+			replies.emplace_back((uint32_t)this->_debug.lastInAddress);
+			replies.emplace_back((uint32_t)this->_debug.lastOutAddress);
+			replies.emplace_back((uint32_t)this->_debug.lastInCmd);
+			replies.emplace_back((uint32_t)this->_debug.lastOutCmd);
+		}
+		break;
+	// DEBUF STOP
 
 	default:
 		return CommandStatus::NOT_FOUND;
