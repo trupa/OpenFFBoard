@@ -4,6 +4,7 @@
  *  Created on: October 19, 2022
  *      Author: Yannick
  * 				1Plus2Equals3D
+ *              PilotWave11
  */
 
 
@@ -57,17 +58,6 @@ enum class RmdError : uint16_t {
     speeding = 0x0100,
     motor_over_temperature = 0x1000,
     encoder_calibration_error = 0x2000
-    /*
-    AXIS_ERROR_NONE = 0x00000000,
-    AXIS_ERROR_INVALID_STATE  = 0x00000001,
-    AXIS_ERROR_WATCHDOG_TIMER_EXPIRED = 0x00000800,
-    AXIS_ERROR_MIN_ENDSTOP_PRESSED = 0x00001000,
-    AXIS_ERROR_MAX_ENDSTOP_PRESSED = 0x00002000,
-    AXIS_ERROR_ESTOP_REQUESTED = 0x00004000,
-    AXIS_ERROR_HOMING_WITHOUT_ENDSTOP = 0x00020000,
-    AXIS_ERROR_OVER_TEMP = 0x00040000,
-    AXIS_ERROR_UNKNOWN_POSITION = 0x00080000
-    */
 };
 
 
@@ -83,8 +73,9 @@ enum class RmdCmd : uint8_t
     read_status_1 = 0x9A,
     read_status_2 = 0x9C,
     read_status_3 = 0x9D,
-    read_home_position = 0x61, //w/o zero offset
     read_multiturn_position = 0x60,
+    read_home_position = 0x61, //w/o zero offset
+    read_zero_offset = 0x62,
     read_multiturn_angle = 0x92,
     read_acceleration = 0x42,
     read_pid = 0x30,
@@ -92,11 +83,15 @@ enum class RmdCmd : uint8_t
     System_operating_mode_acquisition = 0x70,
     // Complex commands that require changing more than just the first item in the buffer array, see protocol
     torque_closed_loop = 0xA1, //data in [4] and [5]
+    speed_closed_loop = 0xA2,
+    pos_tracking_control = 0xA3,
+    abs_pos_closed_loop = 0xA4,
+    inc_pos_closed_loop = 0xA8,
 };
 
 // Internal commands
 enum class RmdCAN_commands : uint32_t{
-    canid,canspd,error,state,maxtorque,connected,voltage,encoderposition,debug
+    canid,canspd,error,state,maxtorque,connected,voltage,encpos,homepos,zerooffset,abspos,incpos,spd,trackpos,debug
 };
 
 // DEBUG START
@@ -114,7 +109,7 @@ struct RmdDebug
 /*                    Main Class                              */
 
 
-class RmdCAN : public MotorDriver,public PersistentStorage, public Encoder, public CanHandler, public CommandHandler, cpp_freertos::Thread{
+class RmdCAN : public MotorDriver, public PersistentStorage, public Encoder, public CanHandler, public CommandHandler, cpp_freertos::Thread{
 public:
     RmdCAN(uint8_t id);
     virtual ~RmdCAN();
@@ -129,7 +124,7 @@ public:
     Encoder* getEncoder() override;
     bool hasIntegratedEncoder() {return true;}
     bool motorReady() override;
-       float getPos_f() override;
+    float getPos_f() override;
     uint32_t getCpr() override;
     int32_t getPos() override;
     void setPos(int32_t pos) override;
@@ -138,6 +133,8 @@ public:
     void saveFlash() override; 		// Write to flash here
     void restoreFlash() override;	// Load from flash
     CommandStatus command(const ParsedCommand& cmd,std::vector<CommandReply>& replies) override;
+
+    void getPosOffset();
 
     void sendCmd(RmdCmd cmd);
     void sendMsg(uint8_t *buffer);
@@ -157,8 +154,11 @@ public:
 private:
     CANPort* port = &canport;
     float lastPos = 0;
+    int32_t homePos = 0;
+    int32_t posOffset = 0;
+
+    float lastAng = 0;
     float lastSpeed = 0;
-    float posOffset = 0;
     float lastVoltage = 0;
     uint32_t lastVoltageUpdate = 0;
     uint32_t lastCanMessage = 0;
@@ -177,7 +177,7 @@ private:
 
     volatile RmdLocalState state = RmdLocalState::IDLE;
 
-      volatile RmdError motor_error = RmdError::none; 
+    volatile RmdError motor_error = RmdError::none; 
     // Not yet used by rmd (0.5.4):
     volatile uint32_t rmdMotorFlags = 0;
     volatile uint32_t rmdEncoderFlags = 0;
@@ -229,6 +229,7 @@ void buffer_append_float32(uint8_t *buffer, float number, float scale, int32_t i
 void buffer_append_int32(uint8_t *buffer, int32_t number, int32_t index); 
 void buffer_append_int16(uint8_t *buffer, int16_t number, int32_t index);
 void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t index);
+void buffer_append_uint16(uint8_t *buffer, uint16_t number, int32_t index);
 
 uint32_t buffer_get_uint32(const uint8_t *buffer, int32_t index);
 uint16_t buffer_get_uint16(const uint8_t *buffer, int32_t index);

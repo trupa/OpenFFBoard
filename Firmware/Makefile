@@ -172,6 +172,10 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 
 CXXFLAGS = $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPTCPP) -Wall -fdata-sections -ffunction-sections -fno-exceptions -fno-use-cxa-atexit -std=gnu++17 -fstack-usage
 
+ifeq ($(DEBUG), 1)
+CXXFLAGS += -g -gdwarf-2
+endif
+
 #######################################
 # LDFLAGS
 #######################################
