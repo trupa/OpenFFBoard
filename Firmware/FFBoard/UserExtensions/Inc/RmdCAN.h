@@ -24,8 +24,6 @@
 #define RMD_THREAD_MEM 512
 #define RMD_THREAD_PRIO 25 // Must be higher than main thread
 
-/*              ***** Data *****             */
-
 enum class RmdPIDSettings : uint8_t {
     CurrentKp = 0x19, // Current Kp
     CurrentKi = 0x19, // Current Ki
@@ -59,8 +57,6 @@ enum class RmdError : uint16_t {
     motor_over_temperature = 0x1000,
     encoder_calibration_error = 0x2000
 };
-
-
 
 enum class RmdCmd : uint8_t
 {
@@ -104,18 +100,12 @@ struct RmdDebug
 };
 // DEBUG STOP
 
-
-
-/*                    Main Class                              */
-
-
 class RmdCAN : public MotorDriver, public PersistentStorage, public Encoder, public CanHandler, public CommandHandler, cpp_freertos::Thread{
 public:
     RmdCAN(uint8_t id);
     virtual ~RmdCAN();
     const ClassIdentifier getInfo() = 0;
     void Run();
-
 
     // Overrides
     void turn(int16_t power) override;
@@ -129,7 +119,7 @@ public:
     int32_t getPos() override;
     void setPos(int32_t pos) override;
     EncoderType getEncoderType() override;
-       void canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHeaderTypeDef* rxHeader,uint32_t fifo) override;
+    void canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHeaderTypeDef* rxHeader,uint32_t fifo) override;
     void saveFlash() override; 		// Write to flash here
     void restoreFlash() override;	// Load from flash
     CommandStatus command(const ParsedCommand& cmd,std::vector<CommandReply>& replies) override;
@@ -153,12 +143,12 @@ public:
 
 private:
     CANPort* port = &canport;
-    float lastPos = 0;
-    int32_t homePos = 0;
-    int32_t posOffset = 0;
+    float lastPos = 0; /* turns */
+    float lastAng = 0; /* deg */
+    int32_t homePos = 0; /* counts */
+    int32_t posOffset = 0; /* counts */
 
-    float lastAng = 0;
-    float lastSpeed = 0;
+    float lastSpeed = 0; /* dps */
     float lastVoltage = 0;
     uint32_t lastVoltageUpdate = 0;
     uint32_t lastCanMessage = 0;
@@ -189,7 +179,6 @@ private:
 
 };
 
-
 /*                  Instance Creation                         */
 /**
  * Instance 1 of Rmd
@@ -218,8 +207,6 @@ public:
     static ClassIdentifier info;
     static bool inUse;
 };
-
-
 
 /*                ***** Helper Functions *****                */
 

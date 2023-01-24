@@ -4,13 +4,12 @@
  *  Created on: October 19, 2022
  *      Author: Yannick
  * 				1Plus2Equals3D
+ * 				PilotWave11
  */
-
 
 #include "target_constants.h"
 #ifdef RMD
 #include <RmdCAN.h>
-
 
 // Instance setup
 
@@ -40,8 +39,6 @@ bool RmdCAN1::isCreatable(){
 bool RmdCAN2::isCreatable(){
 	return !RmdCAN2::inUse; // Creatable if not already in use for example by another axis
 }
-
-/*              De/Constructor                 */
 
 RmdCAN::RmdCAN(uint8_t id)  : CommandHandler("rmd", CLSID_MOT_RMD0,id),  Thread("RMD", RMD_THREAD_MEM, RMD_THREAD_PRIO), motorId(id) {
 
@@ -149,8 +146,6 @@ void RmdCAN::saveFlash(){
 	Flash_Write(setting1addr, settings1);
 }
 
-/*                        Run Loop                                */
-
 void RmdCAN::Run(){
 	while(true){
 		this->Delay(500);
@@ -181,11 +176,6 @@ void RmdCAN::Run(){
 				break;
 		}
 
-		if(HAL_GetTick() - lastCanMessage > 500){
-			// this->sendCmd(RmdCmd::read_multiturn_position);
-			// this->sendCmd(RmdCmd::read_status_1);
-		}
-
 		if(HAL_GetTick() - lastVoltageUpdate > 1000){
 			sendCmd(RmdCmd::read_status_1); // Update voltage
 		}
@@ -200,14 +190,10 @@ void RmdCAN::Run(){
 	}
 }
 
-
-/*                      START/STOP/State                           */
-
 void RmdCAN::motorOff(){
 	active = false;
-	// sendCmd(RmdCmd::motor_off);
+	sendCmd(RmdCmd::motor_off);
 }
-
 
 void RmdCAN::stopMotor(){
     // Temporarily calling "motor_off" instead as I am unsure if this is a hard stop or should stop closed loop calculation
@@ -219,7 +205,7 @@ void RmdCAN::stopMotor(){
 
 void RmdCAN::startMotor(){
 	active = true;
-	// this->setTorque(0.0);
+	this->setTorque(0.0);
 }
 
 bool RmdCAN::motorReady(){
@@ -243,9 +229,6 @@ void RmdCAN::resetPID() {
 	this->sendMsg(data);
 }
 
-
-/*                          CAN                            */
-
 void RmdCAN::sendCmd(RmdCmd cmd){
     uint8_t buffer[8] = {0};
     buffer[0] = (uint8_t)cmd;
@@ -267,11 +250,7 @@ void RmdCAN::sendMsg(uint8_t *buffer){
 	// DEBUG STOP
 
 	port->sendMessage(msg);
-
 }
-
-
-/*						Direct CANBus incoming messages					*/
 
 void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHeaderTypeDef* rxHeader,uint32_t fifo){
 	// DEBUG START
@@ -301,7 +280,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			break;
 		}
 
-		case RmdCmd::read_multiturn_position: // encoder realtive pos
+		case RmdCmd::read_multiturn_position: // 0x60
 		{
 			float turns = 0.0;
 			float epos = buffer_get_int32(rxBuf, 4) * 1.0;
@@ -311,43 +290,62 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			break;
 		}
 
-		case RmdCmd::read_multiturn_angle: // encoder realtive pos
+		case RmdCmd::read_multiturn_angle: // 0x92
 		{
+			/* 0.01 deg/LSB precision */
 			this->lastAng = buffer_get_int32(rxBuf, 4) * 0.01;
 			break;
 		}
 
-		case RmdCmd::read_home_position: // encoder home pos
+		case RmdCmd::read_home_position: // 0x61
 		{
 			this->homePos = buffer_get_int32(rxBuf, 4);
 			break;
 		}
 
-		case RmdCmd::read_zero_offset: // encoder zero
+		case RmdCmd::read_zero_offset: // 0x62
 		{
 			this->posOffset = buffer_get_int32(rxBuf, 4);
 			break;
 		}
 
-		case RmdCmd::abs_pos_closed_loop: // encoder pos float
+		case RmdCmd::abs_pos_closed_loop: // 0xA4
 		{
-			this->lastAng = (float)buffer_get_int16(rxBuf, 6);
+			/* 1 dps/LSB precision */
+			this->lastSpeed = buffer_get_int16(rxBuf, 4);
+			/* 1 deg/LSB precision */
+			this->lastAng = buffer_get_int16(rxBuf, 6);
 			break;
 		}
-		case RmdCmd::inc_pos_closed_loop: // encoder pos float
+		case RmdCmd::inc_pos_closed_loop: // 0xA8
 		{
-			this->lastAng = (float)buffer_get_int16(rxBuf, 6);
+			/* 1 dps/LSB precision */
+			this->lastSpeed = buffer_get_int16(rxBuf, 4);
+			/* 1 deg/LSB precision */
+			this->lastAng = buffer_get_int16(rxBuf, 6);
+			break;
+		}
+		case RmdCmd::speed_closed_loop: // 0xA2
+		{
+			/* 1 dps/LSB precision */
+			this->lastSpeed = buffer_get_int16(rxBuf, 4);
+			/* 1 deg/LSB precision */
+			this->lastAng = buffer_get_int16(rxBuf, 6);
+			break;
+		}	
+		case RmdCmd::pos_tracking_control: // 0xA3
+		{
+			/* 1 dps/LSB precision */
+			this->lastSpeed = buffer_get_int16(rxBuf, 4);
+			/* 1 deg/LSB precision */
+			this->lastAng = buffer_get_int16(rxBuf, 6);
 			break;
 		}
 
 		default:
 			break;
 	}	
-
-
 }
-
-/*              Encoder                                     */
 
 Encoder* RmdCAN::getEncoder(){
 	return static_cast<Encoder*>(this);
@@ -356,7 +354,6 @@ Encoder* RmdCAN::getEncoder(){
 EncoderType RmdCAN::getEncoderType(){
 	return EncoderType::absolute;
 }
-
 
 void RmdCAN::getPosOffset(){
 	// Only change encoder count internally as offset
@@ -370,14 +367,7 @@ void RmdCAN::setPos(int32_t pos){
 	// if(this->connected)
 		// sendCmd(RmdCmd::read_zero_offset);
 	// posOffset = lastPos - ((float)pos / (float)getCpr());
-}
-
-// float RmdCAN::getPos_f(){
-// 	if(getCpr() == 0){
-// 		return 0.0; // cpr not set.
-// 	}
-// 	return (float)this->getPos() / (float)this->getCpr();
-// }   
+} 
 
 float RmdCAN::getPos_f(){
 	if(this->connected)
@@ -386,7 +376,6 @@ float RmdCAN::getPos_f(){
 		sendCmd(RmdCmd::read_multiturn_angle);
 	}
 	return lastPos;
-	// return lastAng / (360.0 * 9.0) * 0.01;
 }   
 
 int32_t RmdCAN::getPos(){
@@ -396,7 +385,6 @@ int32_t RmdCAN::getPos(){
 uint32_t RmdCAN::getCpr(){
 	return 16384;
 }
-
 /**
  * Turn the motor with positive/negative power.
  * Range should be full signed 16 bit
@@ -422,8 +410,6 @@ void RmdCAN::setTorque(float torque){
 		sendMsg(buffer);
 	}
 }
-
-/*              Interal Command Control             */
 
 CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>& replies){
 
@@ -515,16 +501,18 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 			replies.emplace_back(this->lastAng);
 		}
 		else if(cmd.type == CMDtype::set){
-			// if(motorReady())
-			// {
+			if(motorReady())
+			{
 				uint8_t buffer[8] = {0};
 				buffer[0] = (uint8_t)RmdCmd::abs_pos_closed_loop;
 				uint16_t maxspd = 250;
 				buffer_append_uint16(buffer, maxspd, 2);
+				/* cmd.val is assumed to be in deg,
+				and precision is 0.01 deg/LSB */
 				int32_t absAng = cmd.val * 100;
 				buffer_append_int32(buffer, absAng, 4);
 				sendMsg(buffer);
-			// }
+			}
 		}
 		break;
 
@@ -533,34 +521,36 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 			replies.emplace_back(this->lastAng);
 		}
 		else if(cmd.type == CMDtype::set){
-			// if(motorReady())
-			// {
+			if(motorReady())
+			{
 				uint8_t buffer[8] = {0};
 				buffer[0] = (uint8_t)RmdCmd::inc_pos_closed_loop;
 				uint16_t maxspd = 250;
 				buffer_append_uint16(buffer, maxspd, 2);
-				int32_t incAng = 0;
+				/* cmd.val is assumed to be in deg,
+				and precision is 0.01 deg/LSB */
+				int32_t incAng = cmd.val * 100;
 				buffer_append_int32(buffer, incAng, 4);
 				sendMsg(buffer);
-			// }
+			}
 		}
 		break;
 		
 	case RmdCAN_commands::spd:
 		if(cmd.type == CMDtype::get) {
-			replies.emplace_back(this->lastAng);
+			replies.emplace_back(this->lastSpeed);
 		}
 		else if(cmd.type == CMDtype::set){
-			// if(motorReady())
-			// {
+			if(motorReady())
+			{
 				uint8_t buffer[8] = {0};
-				buffer[0] = (uint8_t)RmdCmd::abs_pos_closed_loop;
-				uint16_t maxspd = 250;
-				buffer_append_uint16(buffer, maxspd, 2);
-				int32_t absAng = 0;
-				buffer_append_int32(buffer, absAng, 4);
+				buffer[0] = (uint8_t)RmdCmd::speed_closed_loop;
+				/* cmd.val is assumed to be in dps,
+				and precision is 0.01 dps/LSB */
+				int32_t spd = cmd.val * 100;
+				buffer_append_int32(buffer, spd, 4);
 				sendMsg(buffer);
-			// }
+			}
 		}
 		break;
 
@@ -569,14 +559,16 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 			replies.emplace_back(this->lastAng);
 		}
 		else if(cmd.type == CMDtype::set){
-			// if(motorReady())
-			// {
+			if(motorReady())
+			{
 				uint8_t buffer[8] = {0};
 				buffer[0] = (uint8_t)RmdCmd::pos_tracking_control;
-				int32_t absAng = 0;
-				buffer_append_int32(buffer, absAng, 4);
+				/* cmd.val is assumed to be in deg,
+				and precision is 0.01 deg/LSB */
+				int32_t pos = cmd.val * 100;
+				buffer_append_int32(buffer, pos, 4);
 				sendMsg(buffer);
-			// }
+			}
 		}
 		break;
 
@@ -598,10 +590,6 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 	return CommandStatus::OK;
 }
 
-
-/*              ***** Helper Functions *****             */
-
-
 float normalize(float input, float min, float max)
 {
     float average = (min + max)/2;
@@ -611,16 +599,21 @@ float normalize(float input, float min, float max)
 }
 
 // Index is where I want the item to be placed
+void buffer_append_int16(uint8_t *buffer, int16_t number, int32_t index) {
+    buffer[(index)++] = number;
+    buffer[(index)++] = number >> 8;
+}
+
+void buffer_append_uint16(uint8_t *buffer, uint16_t number, int32_t index) {
+    buffer[(index)++] = number;
+    buffer[(index)++] = number >> 8;
+}
+
 void buffer_append_int32(uint8_t *buffer, int32_t number, int32_t index) {
     buffer[(index)++] = number;
     buffer[(index)++] = number >> 8;
     buffer[(index)++] = number >> 16;
     buffer[(index)++] = number >> 24;
-}
-// Index is where I want the item to be placed
-void buffer_append_int16(uint8_t *buffer, int16_t number, int32_t index) {
-    buffer[(index)++] = number;
-    buffer[(index)++] = number >> 8;
 }
 
 void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t index) {
@@ -629,16 +622,10 @@ void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t index) {
     buffer[(index)++] = number >> 16;
     buffer[(index)++] = number >> 24;
 }
-void buffer_append_uint16(uint8_t *buffer, uint16_t number, int32_t index) {
-    buffer[(index)++] = number;
-    buffer[(index)++] = number >> 8;
-}
 
-uint32_t buffer_get_uint32(const uint8_t *buffer, int32_t index) {
-    uint32_t res = ((uint32_t) buffer[index + 3]) << 24
-            | ((uint32_t) buffer[index + 2]) << 16
-            | ((uint32_t) buffer[index + 1]) << 8
-            | ((uint32_t) buffer[index]);
+int16_t buffer_get_int16(const uint8_t *buffer, int32_t index) {
+    int16_t res = ((uint16_t) buffer[index + 1]) << 8
+            | ((uint16_t) buffer[index]);
     return res;
 }
 
@@ -656,11 +643,11 @@ int32_t buffer_get_int32(const uint8_t *buffer, int32_t index) {
     return res;
 }
 
-int16_t buffer_get_int16(const uint8_t *buffer, int32_t index) {
-    int16_t res = ((uint16_t) buffer[index + 1]) << 8
-            | ((uint16_t) buffer[index]);
+uint32_t buffer_get_uint32(const uint8_t *buffer, int32_t index) {
+    uint32_t res = ((uint32_t) buffer[index + 3]) << 24
+            | ((uint32_t) buffer[index + 2]) << 16
+            | ((uint32_t) buffer[index + 1]) << 8
+            | ((uint32_t) buffer[index]);
     return res;
 }
-
-
 #endif
