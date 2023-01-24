@@ -282,11 +282,9 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 
 		case RmdCmd::read_multiturn_position: // 0x60
 		{
-			float turns = 0.0;
-			float epos = buffer_get_int32(rxBuf, 4) * 1.0;
+			float epos = static_cast<float>(buffer_get_int32(rxBuf, 4));
 			float cpr = getCpr();
-			turns = (float)((float)epos / (float)cpr);
-			this->lastPos = (float)turns;
+			this->lastPos = static_cast<float>(epos / cpr);
 			break;
 		}
 
