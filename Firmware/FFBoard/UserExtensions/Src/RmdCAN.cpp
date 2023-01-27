@@ -303,7 +303,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 
 		case RmdCmd::read_zero_offset: // 0x62
 		{
-			this->posOffset = buffer_get_int32(rxBuf, 4);
+			// this->posOffset = buffer_get_int32(rxBuf, 4);
 			break;
 		}
 
@@ -362,9 +362,7 @@ void RmdCAN::getPosOffset(){
 
 void RmdCAN::setPos(int32_t pos){
 	// Only change encoder count internally as offset
-	// if(this->connected)
-		// sendCmd(RmdCmd::read_zero_offset);
-	// posOffset = lastPos - ((float)pos / (float)getCpr());
+	posOffset = lastPos;
 } 
 
 float RmdCAN::getPos_f(){
@@ -373,7 +371,7 @@ float RmdCAN::getPos_f(){
 		sendCmd(RmdCmd::read_multiturn_position);
 		sendCmd(RmdCmd::read_multiturn_angle);
 	}
-	return lastPos;
+	return lastPos - posOffset;
 }   
 
 int32_t RmdCAN::getPos(){
@@ -403,6 +401,7 @@ void RmdCAN::setTorque(float torque){
 		if (torque == 0.0)
 			output_torque = 0;
 		else
+		/* 0.01 A/LSB precision */
 			output_torque  = (int16_t)(1000*torque);
 		buffer_append_int16(buffer, output_torque, 4);
 		sendMsg(buffer);
@@ -490,7 +489,7 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 	case RmdCAN_commands::zerooffset:
 		if(cmd.type == CMDtype::get) {
 			sendCmd(RmdCmd::read_zero_offset);
-			replies.emplace_back((int32_t)this->posOffset);
+			replies.emplace_back(this->posOffset);
 		}
 		break;
 		

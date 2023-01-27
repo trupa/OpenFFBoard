@@ -144,9 +144,9 @@ public:
 private:
     CANPort* port = &canport;
     float lastPos = 0; /* turns */
+    float posOffset = 0; /* turns */
     float lastAng = 0; /* deg */
     int32_t homePos = 0; /* counts */
-    int32_t posOffset = 0; /* counts */
 
     float lastSpeed = 0; /* dps */
     float lastVoltage = 0;
