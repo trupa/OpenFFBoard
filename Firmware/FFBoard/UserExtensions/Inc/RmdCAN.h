@@ -64,8 +64,8 @@ enum class RmdCmd : uint8_t
     /* */
     // Simple commands to place in first position in the uint8_t[8] buffer of a can messsage. These trigger
     // A simple reaction or reply
+    motor_shutdown = 0x80,
     motor_stop = 0x81,
-    motor_off = 0x80,
     read_status_1 = 0x9A,
     read_status_2 = 0x9C,
     read_status_3 = 0x9D,

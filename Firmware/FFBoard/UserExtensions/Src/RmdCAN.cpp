@@ -46,9 +46,9 @@ RmdCAN::RmdCAN(uint8_t id)  : CommandHandler("rmd", CLSID_MOT_RMD0,id),  Thread(
 
 	// Set up a filter to receive rmd commands
 	CAN_FilterTypeDef sFilterConfig;
-	sFilterConfig.FilterBank = 0;
+	sFilterConfig.FilterBank = motorId;
 	sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT
 	sFilterConfig.FilterIdHigh = 0x0000;
 	sFilterConfig.FilterIdLow = 0x0000;
 	sFilterConfig.FilterMaskIdHigh = 0x0000;
@@ -192,14 +192,14 @@ void RmdCAN::Run(){
 
 void RmdCAN::motorOff(){
 	active = false;
-	sendCmd(RmdCmd::motor_off);
+	sendCmd(RmdCmd::motor_shutdown);
 }
 
 void RmdCAN::stopMotor(){
-    // Temporarily calling "motor_off" instead as I am unsure if this is a hard stop or should stop closed loop calculation
-    //	active = false; 
-    //	this->setTorque(0.0);
-    //	sendCmd(RmdCmd::motor_stop);
+    // Temporarily calling "motor_shutdown" instead as I am unsure if this is a hard stop or should stop closed loop calculation
+    	active = false; 
+    	this->setTorque(0.0);
+    	sendCmd(RmdCmd::motor_stop);
     this->motorOff();
 }
 
