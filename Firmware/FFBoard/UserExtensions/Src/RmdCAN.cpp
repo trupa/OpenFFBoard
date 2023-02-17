@@ -44,19 +44,7 @@ RmdCAN::RmdCAN(uint8_t id)  : CommandHandler("rmd", CLSID_MOT_RMD0,id),  Thread(
 
 	restoreFlash();
 
-	// Set up a filter to receive rmd commands
-	CAN_FilterTypeDef sFilterConfig;
-	sFilterConfig.FilterBank = motorId;
-	sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT
-	sFilterConfig.FilterIdHigh = 0x0000;
-	sFilterConfig.FilterIdLow = 0x0000;
-	sFilterConfig.FilterMaskIdHigh = 0x0000;
-	sFilterConfig.FilterMaskIdLow = 0x0000;
-	sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
-	sFilterConfig.FilterActivation = ENABLE;
-	sFilterConfig.SlaveStartFilterBank = 14;
-	this->filterId = this->port->addCanFilter(sFilterConfig);
+	setCanFilter();
 
 	if(port->getSpeedPreset() < 5){
 		port->setSpeedPreset(5); // Minimum 1000k
@@ -72,6 +60,23 @@ RmdCAN::~RmdCAN() {
 	this->setTorque(0.0);
 	this->port->removeCanFilter(filterId);
 	this->port->freePort();
+}
+
+void RmdCAN::setCanFilter(){
+	// Set up a filter to receive odrive commands
+	CAN_FilterTypeDef sFilterConfig;
+	uint16_t can_rx_id = motorId + 1 + incoming_base_id;
+	sFilterConfig.FilterBank = 0;
+	sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+	sFilterConfig.FilterIdHigh = can_rx_id << 5;
+	sFilterConfig.FilterIdLow = 0x0000;
+	sFilterConfig.FilterMaskIdHigh = 0b11111111111 << 5;
+	sFilterConfig.FilterMaskIdLow = 0x0000;
+	sFilterConfig.FilterFIFOAssignment = motorId % 2 == 0 ? CAN_RX_FIFO0 : CAN_RX_FIFO1;
+	sFilterConfig.FilterActivation = ENABLE;
+	sFilterConfig.SlaveStartFilterBank = 14;
+	this->filterId = this->port->addCanFilter(sFilterConfig);
 }
 
 // Commands and Flash
@@ -393,8 +398,8 @@ void RmdCAN::turn(int16_t power){
 
 // Input must be between -1.0 and 1.0
 void RmdCAN::setTorque(float torque){
-	if(motorReady())
-	{
+	// if(motorReady())
+	// {
 		uint8_t buffer[8] = {0};
 		buffer[0] = (uint8_t)RmdCmd::torque_closed_loop;
 		int16_t output_torque;
@@ -405,7 +410,7 @@ void RmdCAN::setTorque(float torque){
 			output_torque  = (int16_t)(1000*torque);
 		buffer_append_int16(buffer, output_torque, 4);
 		sendMsg(buffer);
-	}
+	// }
 }
 
 CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>& replies){

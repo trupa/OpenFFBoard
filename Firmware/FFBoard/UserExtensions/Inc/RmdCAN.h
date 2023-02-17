@@ -138,6 +138,8 @@ public:
 
     void registerCommands();
 
+    void setCanFilter();
+
     std::string getHelpstring(){return "Rmd motor driver with CAN";};
 
 
