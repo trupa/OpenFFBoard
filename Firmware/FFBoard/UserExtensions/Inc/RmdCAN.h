@@ -119,6 +119,7 @@ public:
     int32_t getPos() override;
     void setPos(int32_t pos) override;
     EncoderType getEncoderType() override;
+	void canErrorCallback(CAN_HandleTypeDef *hcan);
     void canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHeaderTypeDef* rxHeader,uint32_t fifo) override;
     void saveFlash() override; 		// Write to flash here
     void restoreFlash() override;	// Load from flash
@@ -154,6 +155,9 @@ private:
     float lastVoltage = 0;
     uint32_t lastVoltageUpdate = 0;
     uint32_t lastCanMessage = 0;
+
+	uint32_t lastPosTime = 0;
+	bool posWaiting = false;
 
     int8_t motorId = 0;
 

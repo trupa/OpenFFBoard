@@ -71,7 +71,8 @@ void RmdCAN::setCanFilter(){
 	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
 	sFilterConfig.FilterIdHigh = can_rx_id << 5;
 	sFilterConfig.FilterIdLow = 0x0000;
-	sFilterConfig.FilterMaskIdHigh = 0b11111111111 << 5;
+	// sFilterConfig.FilterMaskIdHigh = 0b11111111111 << 5;
+	sFilterConfig.FilterMaskIdHigh = 0x07e0 << 5;
 	sFilterConfig.FilterMaskIdLow = 0x0000;
 	sFilterConfig.FilterFIFOAssignment = motorId % 2 == 0 ? CAN_RX_FIFO0 : CAN_RX_FIFO1;
 	sFilterConfig.FilterActivation = ENABLE;
@@ -257,6 +258,10 @@ void RmdCAN::sendMsg(uint8_t *buffer){
 	port->sendMessage(msg);
 }
 
+void RmdCAN::canErrorCallback(CAN_HandleTypeDef *hcan){
+	//pulseErrLed();
+}
+
 void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHeaderTypeDef* rxHeader,uint32_t fifo){
 	// DEBUG START
 	this->_debug.lastInAddress = rxHeader->StdId;
@@ -290,6 +295,9 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			float epos = static_cast<float>(buffer_get_int32(rxBuf, 4));
 			float cpr = getCpr();
 			this->lastPos = static_cast<float>(epos / cpr);
+
+			this->lastPosTime = HAL_GetTick();
+			this->posWaiting = false;
 			break;
 		}
 
@@ -371,8 +379,8 @@ void RmdCAN::setPos(int32_t pos){
 } 
 
 float RmdCAN::getPos_f(){
-	if(this->connected)
-	{
+	if(this->connected && (!posWaiting || HAL_GetTick() - lastPosTime > 5)){
+		posWaiting = true;
 		sendCmd(RmdCmd::read_multiturn_position);
 		sendCmd(RmdCmd::read_multiturn_angle);
 	}
