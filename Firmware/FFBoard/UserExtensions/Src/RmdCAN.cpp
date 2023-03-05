@@ -71,8 +71,7 @@ void RmdCAN::setCanFilter(){
 	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
 	sFilterConfig.FilterIdHigh = can_rx_id << 5;
 	sFilterConfig.FilterIdLow = 0x0000;
-	// sFilterConfig.FilterMaskIdHigh = 0b11111111111 << 5;
-	sFilterConfig.FilterMaskIdHigh = 0x07e0 << 5;
+	sFilterConfig.FilterMaskIdHigh = 0b11111111111 << 5;
 	sFilterConfig.FilterMaskIdLow = 0x0000;
 	sFilterConfig.FilterFIFOAssignment = motorId % 2 == 0 ? CAN_RX_FIFO0 : CAN_RX_FIFO1;
 	sFilterConfig.FilterActivation = ENABLE;
