@@ -171,12 +171,14 @@ private:
 	bool posWaiting = false;
 
     int8_t motorId = 0;
+    uint16_t canId = 0;
+    int32_t filterId = 0;
 
     uint16_t outgoing_base_id = 0x140; // Add 1 for motor 1, 2 for motor2
     uint16_t incoming_base_id = 0x240; // Add 1 for motor 1, 2 for motor2
 
     uint8_t baudrate = CANSPEEDPRESET_500; // 250000, 500000, 1M
-    int32_t filterId = 0;
+
     bool connected = false;
 
     float maxTorque = 1.0; // range how to scale the torque output

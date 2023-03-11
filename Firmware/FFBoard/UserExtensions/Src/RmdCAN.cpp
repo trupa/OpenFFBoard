@@ -67,7 +67,7 @@ RmdCAN::~RmdCAN() {
 void RmdCAN::setCanFilter(){
 	// Set up a filter to receive odrive commands
 	CAN_FilterTypeDef sFilterConfig;
-	uint16_t can_rx_id = motorId + 1 + incoming_base_id;
+	uint16_t can_rx_id = canId + incoming_base_id;
 	sFilterConfig.FilterBank = 0;
 	sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
 	sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
@@ -93,7 +93,7 @@ void RmdCAN::setAddress(uint8_t id) {
 
 void RmdCAN::registerCommands(){
 	CommandHandler::registerCommands();
-	registerCommand("canid", RmdCAN_commands::canid, "CAN ID",CMDFLAG_GET);
+	registerCommand("canid", RmdCAN_commands::canid, "CAN ID",CMDFLAG_GET | CMDFLAG_SET);
 	registerCommand("canspd", RmdCAN_commands::canspd, "CAN baudrate",CMDFLAG_GET | CMDFLAG_SET);
 	registerCommand("error", RmdCAN_commands::error, "Rmd error flags",CMDFLAG_GET);
 	registerCommand("state", RmdCAN_commands::state, "Rmd state",CMDFLAG_GET);
@@ -119,8 +119,7 @@ void RmdCAN::restoreFlash(){
 	
 	if(Flash_Read(flashAddrs.canId, &dataFlash))
 	{
-		// this->OFFB_can_Id = dataFlash & 0xFF;
-		// this->VESC_can_Id = (dataFlash >> 8) & 0xFF;
+		this->canId = dataFlash;
 	}
 
 	if(Flash_Read(flashAddrs.maxTorque, &dataFlash))
@@ -136,8 +135,8 @@ void RmdCAN::restoreFlash(){
 
 void RmdCAN::saveFlash(){
 
-	uint16_t canId = motorId;
-	Flash_Write(flashAddrs.canId, canId);
+	uint16_t cid = canId;
+	Flash_Write(flashAddrs.canId, cid);
 
 	uint16_t mt = ((int32_t)(maxTorque*100) & 0xfff);
 	Flash_Write(flashAddrs.maxTorque, mt);
@@ -241,7 +240,7 @@ void RmdCAN::sendMsg(uint8_t *buffer){
 	msg.header.RTR = CAN_RTR_DATA;
 	msg.header.DLC = 8;
 	msg.header.IDE = 0;
-	msg.header.StdId = outgoing_base_id + motorId + 1;
+	msg.header.StdId = outgoing_base_id + canId;
     memcpy(&msg.data, buffer, 8*sizeof(uint8_t));
 
 	// DEBUG START
@@ -262,9 +261,9 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 	this->_debug.lastInCmd = rxBuf[0];
 	// DEBUG STOP
 
-	uint16_t node = rxHeader->StdId - incoming_base_id - 1;
+	uint16_t canNodeId = rxHeader->StdId - incoming_base_id;
 
-	if(node != this->motorId){
+	if(canNodeId != this->canId){
 		return;
 	}
 	RmdCmd cmd = static_cast<RmdCmd>(rxBuf[0]);
@@ -422,8 +421,13 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 
 	case RmdCAN_commands::canid:
 		if(cmd.type == CMDtype::get){
-			replies.emplace_back(outgoing_base_id + motorId + 1);
-		}else{
+			replies.emplace_back(canId);
+		}else if(cmd.type == CMDtype::set){
+			canId = cmd.val;
+			this->port->removeCanFilter(filterId);
+			setCanFilter();
+		}
+		else{
 			return CommandStatus::ERR;
 		}
 		break;
