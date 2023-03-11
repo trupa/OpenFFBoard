@@ -90,6 +90,12 @@ enum class RmdCAN_commands : uint32_t{
     canid,canspd,error,state,maxtorque,connected,voltage,encpos,homepos,zerooffset,abspos,incpos,spd,trackpos,debug
 };
 
+struct RmdFlashAddrs{
+	uint16_t canId = 	ADR_RMD_CANID_M0;
+	uint16_t maxTorque = 	ADR_RMD_MAXTORQUE_M0;
+	uint16_t offset = 	ADR_RMD_OFFSET_M0;
+};
+
 // DEBUG START
 struct RmdDebug
 {
@@ -104,6 +110,8 @@ class RmdCAN : public MotorDriver, public PersistentStorage, public Encoder, pub
 public:
     RmdCAN(uint8_t id);
     virtual ~RmdCAN();
+	void setAddress(uint8_t id);
+
     const ClassIdentifier getInfo() = 0;
     void Run();
 
@@ -145,6 +153,9 @@ public:
 
 
 private:
+
+	RmdFlashAddrs flashAddrs;
+
     CANPort* port = &canport;
     float lastPos = 0; /* turns */
     float posOffset = 0; /* turns */

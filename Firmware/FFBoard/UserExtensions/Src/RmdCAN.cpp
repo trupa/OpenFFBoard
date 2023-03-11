@@ -40,7 +40,9 @@ bool RmdCAN2::isCreatable(){
 	return !RmdCAN2::inUse; // Creatable if not already in use for example by another axis
 }
 
-RmdCAN::RmdCAN(uint8_t id)  : CommandHandler("rmd", CLSID_MOT_RMD0,id),  Thread("RMD", RMD_THREAD_MEM, RMD_THREAD_PRIO), motorId(id) {
+RmdCAN::RmdCAN(uint8_t id)  : CommandHandler("rmd", CLSID_MOT_RMD0, id),  Thread("RMD", RMD_THREAD_MEM, RMD_THREAD_PRIO), motorId(id) {
+
+	setAddress(id);
 
 	restoreFlash();
 
@@ -79,6 +81,14 @@ void RmdCAN::setCanFilter(){
 	this->filterId = this->port->addCanFilter(sFilterConfig);
 }
 
+void RmdCAN::setAddress(uint8_t id) {
+	if (id == 0) {
+		this->flashAddrs = RmdFlashAddrs( { ADR_RMD_CANID_M0, ADR_RMD_MAXTORQUE_M0, ADR_RMD_OFFSET_M0 });
+	} else if (id == 1) {
+		this->flashAddrs = RmdFlashAddrs( { ADR_RMD_CANID_M1, ADR_RMD_MAXTORQUE_M1, ADR_RMD_OFFSET_M1 });
+	}
+}
+
 // Commands and Flash
 
 void RmdCAN::registerCommands(){
@@ -104,51 +114,36 @@ void RmdCAN::registerCommands(){
 }
 
 void RmdCAN::restoreFlash(){
-	uint16_t setting1addr = ADR_RMD_SETTING1_M0;
-	//uint16_t canidaddr = ADR_RMD_CANID_M0;
-	if (this->motorId == 1) {
-		setting1addr = ADR_RMD_SETTING1_M1;
-		//canidaddr = ADR_RMD_CANID_M1;
+
+	uint16_t dataFlash = 0;
+	
+	if(Flash_Read(flashAddrs.canId, &dataFlash))
+	{
+		// this->OFFB_can_Id = dataFlash & 0xFF;
+		// this->VESC_can_Id = (dataFlash >> 8) & 0xFF;
 	}
 
-	/*
-	uint16_t canId = 0x0000;
-	if(Flash_Read(canidaddr, &canId)){
-		this->motorId = canId;
+	if(Flash_Read(flashAddrs.maxTorque, &dataFlash))
+	{
+		this->maxTorque = (float)clip(dataFlash & 0xfff, 0, 0xfff) / 100.0;
 	}
-	*/
 
-	uint16_t settings1 = 0;
-	if(Flash_Read(setting1addr, &settings1)){
-		maxTorque = (float)clip(settings1 & 0xfff, 0, 0xfff) / 100.0;
+	if(Flash_Read(flashAddrs.offset, &dataFlash))
+	{
+		this->posOffset = (float) ((int16_t) dataFlash / 10000.0);
 	}
 }
 
 void RmdCAN::saveFlash(){
-	uint16_t setting1addr = ADR_RMD_SETTING1_M0;
-	//uint16_t canidaddr = ADR_RMD_CANID_M0;
-	if (this->motorId == 1) {
-		setting1addr = ADR_RMD_SETTING1_M1;
-		//canidaddr = ADR_RMD_CANID_M1;
-	}
 
-	/*
-	uint16_t canId = 0x3040;	
-	Flash_Read(ADR_RMD_CANID, &canIds); // Read again
-	if(motorId == 0){
-		canIds &= ~0x3F; // reset bits
-		canIds |= nodeId & 0x3f;
-	}else if(motorId == 1){
-		setting1addr = ADR_RMD_SETTING1_M1;
-		canIds &= ~0xFC0; // reset bits
-		canIds |= (nodeId & 0x3f) << 6;
-	}
-	canIds &= ~0x7000; // reset bits
-	Flash_Write(ADR_RMD_CANID,canIds);
-	*/
+	uint16_t canId = motorId;
+	Flash_Write(flashAddrs.canId, canId);
 
-	uint16_t settings1 = ((int32_t)(maxTorque*100) & 0xfff);
-	Flash_Write(setting1addr, settings1);
+	uint16_t mt = ((int32_t)(maxTorque*100) & 0xfff);
+	Flash_Write(flashAddrs.maxTorque, mt);
+
+	uint16_t offset = ((int16_t) (this->posOffset * 10000) & 0xFFFF);
+	Flash_Write(flashAddrs.offset, offset);
 }
 
 void RmdCAN::Run(){
