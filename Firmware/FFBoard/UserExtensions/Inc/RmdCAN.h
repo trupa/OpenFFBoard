@@ -87,7 +87,7 @@ enum class RmdCmd : uint8_t
 
 // Internal commands
 enum class RmdCAN_commands : uint32_t{
-    canid,canspd,error,state,maxtorque,connected,voltage,encpos,homepos,zerooffset,abspos,incpos,spd,trackpos,debug
+    canid,canspd,error,state,maxtorque,connected,voltage,encpos,homepos,zerooffset,abspos,incpos,spd,trackpos,torque,debug
 };
 
 struct RmdFlashAddrs{
@@ -159,7 +159,7 @@ private:
     CANPort* port = &canport;
     float lastPos = 0; /* turns */
     float posOffset = 0; /* turns */
-    float lastAng = 0; /* deg */
+    int32_t lastAng = 0; /* deg */
     int32_t homePos = 0; /* counts */
 
     float lastSpeed = 0; /* dps */
@@ -182,6 +182,8 @@ private:
     bool connected = false;
 
     float maxTorque = 1.0; // range how to scale the torque output
+    int16_t currentTorque = 0;
+
     bool active = false;
 
     volatile RmdLocalState state = RmdLocalState::IDLE;

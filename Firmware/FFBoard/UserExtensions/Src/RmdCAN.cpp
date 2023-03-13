@@ -107,6 +107,7 @@ void RmdCAN::registerCommands(){
 	registerCommand("ipos", RmdCAN_commands::incpos, "Rmd inc position (deg)",CMDFLAG_GET | CMDFLAG_SET);
 	registerCommand("spd", RmdCAN_commands::spd, "Rmd speed closed loop",CMDFLAG_GET | CMDFLAG_SET);
 	registerCommand("trackpos", RmdCAN_commands::trackpos, "Rmd pos tracking",CMDFLAG_GET | CMDFLAG_SET);
+	registerCommand("torque", RmdCAN_commands::torque, "Current torque",CMDFLAG_GET);
 
 	// DEBUG START
 	registerCommand("debug", RmdCAN_commands::debug, "debugging_data",CMDFLAG_GET);
@@ -297,7 +298,9 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 		case RmdCmd::read_multiturn_angle: // 0x92
 		{
 			/* 0.01 deg/LSB precision */
-			this->lastAng = buffer_get_int32(rxBuf, 4) * 0.01;
+			float af = static_cast<float>(buffer_get_int32(rxBuf, 4));
+			// this->lastAng = static_cast<float>(af / 100);
+			this->lastAng = buffer_get_int32(rxBuf, 4);
 			break;
 		}
 
@@ -318,7 +321,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			/* 1 dps/LSB precision */
 			this->lastSpeed = buffer_get_int16(rxBuf, 4);
 			/* 1 deg/LSB precision */
-			this->lastAng = buffer_get_int16(rxBuf, 6);
+			// this->lastAng = buffer_get_int16(rxBuf, 6);
 			break;
 		}
 		case RmdCmd::inc_pos_closed_loop: // 0xA8
@@ -326,7 +329,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			/* 1 dps/LSB precision */
 			this->lastSpeed = buffer_get_int16(rxBuf, 4);
 			/* 1 deg/LSB precision */
-			this->lastAng = buffer_get_int16(rxBuf, 6);
+			// this->lastAng = buffer_get_int16(rxBuf, 6);
 			break;
 		}
 		case RmdCmd::speed_closed_loop: // 0xA2
@@ -334,7 +337,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			/* 1 dps/LSB precision */
 			this->lastSpeed = buffer_get_int16(rxBuf, 4);
 			/* 1 deg/LSB precision */
-			this->lastAng = buffer_get_int16(rxBuf, 6);
+			// this->lastAng = buffer_get_int16(rxBuf, 6);
 			break;
 		}	
 		case RmdCmd::pos_tracking_control: // 0xA3
@@ -342,7 +345,12 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan,uint8_t* rxBuf,CAN_RxHead
 			/* 1 dps/LSB precision */
 			this->lastSpeed = buffer_get_int16(rxBuf, 4);
 			/* 1 deg/LSB precision */
-			this->lastAng = buffer_get_int16(rxBuf, 6);
+			// this->lastAng = buffer_get_int16(rxBuf, 6);
+			break;
+		}
+		case RmdCmd::torque_closed_loop:
+		{
+			this->currentTorque = buffer_get_int16(rxBuf, 2);
 			break;
 		}
 
@@ -490,6 +498,12 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 		}
 		break;
 
+	case RmdCAN_commands::torque:
+		if(cmd.type == CMDtype::get) {
+			replies.emplace_back(this->currentTorque);
+		}
+		break;
+
 	case RmdCAN_commands::homepos:
 		if(cmd.type == CMDtype::get) {
 			sendCmd(RmdCmd::read_home_position);
@@ -526,7 +540,7 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 
 	case RmdCAN_commands::incpos:
 		if(cmd.type == CMDtype::get) {
-			replies.emplace_back(this->lastAng);
+			// replies.emplace_back(this->lastAng);
 		}
 		else if(cmd.type == CMDtype::set){
 			if(motorReady())
@@ -564,7 +578,7 @@ CommandStatus RmdCAN::command(const ParsedCommand& cmd,std::vector<CommandReply>
 
 	case RmdCAN_commands::trackpos:
 		if(cmd.type == CMDtype::get) {
-			replies.emplace_back(this->lastAng);
+			// replies.emplace_back(this->lastAng);
 		}
 		else if(cmd.type == CMDtype::set){
 			if(motorReady())
