@@ -97,14 +97,18 @@ void RmdCAN::registerCommands() {
   registerCommand("maxtorque", RmdCAN_commands::maxtorque, "Max torque to send for scaling", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("connected", RmdCAN_commands::connected, "Rmd connection state", CMDFLAG_GET);
   registerCommand("voltage", RmdCAN_commands::voltage, "Rmd voltage", CMDFLAG_GET);
+  registerCommand("single_pos", RmdCAN_commands::single_pos, "Rmd read single-turn encoder command", CMDFLAG_GET);
+  registerCommand("multi_pos", RmdCAN_commands::multi_pos, "Rmd read multi-turn encoder command", CMDFLAG_GET);
+  registerCommand("single_ang", RmdCAN_commands::single_ang, "Rmd read single-turn angle command", CMDFLAG_GET);
+  registerCommand("multi_ang", RmdCAN_commands::multi_ang, "Rmd read multi-turn angle command", CMDFLAG_GET);
   registerCommand("epos", RmdCAN_commands::encpos, "Rmd multi-turn relative position (pulses)", CMDFLAG_GET);
   registerCommand("homepos", RmdCAN_commands::homepos, "Rmd multi-turn home position (pulses)", CMDFLAG_GET);
   registerCommand("zoff", RmdCAN_commands::zerooffset, "Rmd multi-turn zero offset (pulses)", CMDFLAG_GET);
-  registerCommand("apos", RmdCAN_commands::abspos, "Rmd abs position (deg)", CMDFLAG_GET | CMDFLAG_SET);
-  registerCommand("ipos", RmdCAN_commands::incpos, "Rmd inc position (deg)", CMDFLAG_GET | CMDFLAG_SET);
-  registerCommand("spd", RmdCAN_commands::spd, "Rmd speed closed loop", CMDFLAG_GET | CMDFLAG_SET);
-  registerCommand("trackpos", RmdCAN_commands::trackpos, "Rmd pos tracking", CMDFLAG_GET | CMDFLAG_SET);
-  registerCommand("torque", RmdCAN_commands::torque, "Current torque", CMDFLAG_GET);
+  registerCommand("apos", RmdCAN_commands::abspos, "Rmd abs position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
+  registerCommand("ipos", RmdCAN_commands::incpos, "Rmd inc position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
+  registerCommand("spd", RmdCAN_commands::spd, "Rmd speed closed loop command", CMDFLAG_GET | CMDFLAG_SET);
+  registerCommand("trackpos", RmdCAN_commands::trackpos, "Rmd pos tracking command", CMDFLAG_GET | CMDFLAG_SET);
+  registerCommand("torque", RmdCAN_commands::torque, "Rmd current torque (A)", CMDFLAG_GET);
 
   registerCommand("debug", RmdCAN_commands::debug, "debugging_data", CMDFLAG_GET);
 }
@@ -157,7 +161,6 @@ void RmdCAN::Run() {
         break;
 
       case RmdLocalState::WAIT_READY:
-	    sendCmd(RmdCmd::read_singleturn_position);
         break;
 
       case RmdLocalState::WAIT_HOMING:
@@ -343,6 +346,13 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
       break;
     }
 
+    case RmdCmd::read_singleturn_angle:  // 0x94
+    {
+      /* 0.01 deg/LSB precision, leave as-is for now */
+      this->lastAng = buffer_get_int16(rxBuf, 6);
+      break;
+    }
+
     case RmdCmd::read_multiturn_angle:  // 0x92
     {
       /* 0.01 deg/LSB precision, leave as-is for now */
@@ -457,6 +467,51 @@ void RmdCAN::executeMotionPlan(float pos, float vel, float kp, float kd, float t
 
 CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply> &replies) {
   switch (static_cast<RmdCAN_commands>(cmd.cmdId)) {
+
+	case RmdCAN_commands::single_pos:
+	{
+		if (cmd.type == CMDtype::get) {
+			sendCmd(RmdCmd::read_singleturn_position);
+			replies.emplace_back(this->lastPos);
+		} else {
+			return CommandStatus::ERR;
+		}
+		break;
+	}
+
+	case RmdCAN_commands::single_ang:
+	{
+		if (cmd.type == CMDtype::get) {
+			sendCmd(RmdCmd::read_singleturn_angle);
+			replies.emplace_back(this->lastAng / 9);
+		} else {
+			return CommandStatus::ERR;
+		}
+		break;
+	}
+
+	case RmdCAN_commands::multi_pos:
+	{
+		if (cmd.type == CMDtype::get) {
+			sendCmd(RmdCmd::read_multiturn_position);
+			replies.emplace_back(this->lastPos);
+		} else {
+			return CommandStatus::ERR;
+		}
+		break;
+	}
+
+	case RmdCAN_commands::multi_ang:
+	{
+		if (cmd.type == CMDtype::get) {
+			sendCmd(RmdCmd::read_multiturn_angle);
+			replies.emplace_back(this->lastAng);
+		} else {
+			return CommandStatus::ERR;
+		}
+		break;
+	}
+
     case RmdCAN_commands::canid:
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(canId);
