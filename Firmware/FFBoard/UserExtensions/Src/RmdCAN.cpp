@@ -15,15 +15,15 @@
 
 // Instance setup
 
-bool RmdCAN1::inUse = false;
+bool RmdCAN1::inUse           = false;
 ClassIdentifier RmdCAN1::info = {
     .name = "Rmd (M0)",
-    .id = CLSID_MOT_RMD0,  // 5
+    .id   = CLSID_MOT_RMD0,  // 5
 };
-bool RmdCAN2::inUse = false;
+bool RmdCAN2::inUse           = false;
 ClassIdentifier RmdCAN2::info = {
     .name = "Rmd (M1)",
-    .id = CLSID_MOT_RMD1,  // 6
+    .id   = CLSID_MOT_RMD1,  // 6
 };
 
 const ClassIdentifier RmdCAN1::getInfo() { return info; }
@@ -65,18 +65,18 @@ RmdCAN::~RmdCAN() {
 // Set up a filter to receive odrive commands
 void RmdCAN::setCanFilter() {
   CAN_FilterTypeDef sFilterConfig;
-  uint16_t can_rx_id = canId + incoming_base_id;
-  sFilterConfig.FilterBank = 0;
-  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-  sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig.FilterIdHigh = can_rx_id << 5;
-  sFilterConfig.FilterIdLow = 0x0000;
-  sFilterConfig.FilterMaskIdHigh = 0b11111111111 << 5;
-  sFilterConfig.FilterMaskIdLow = 0x0000;
+  uint16_t can_rx_id                 = canId + incoming_base_id;
+  sFilterConfig.FilterBank           = 0;
+  sFilterConfig.FilterMode           = CAN_FILTERMODE_IDMASK;
+  sFilterConfig.FilterScale          = CAN_FILTERSCALE_32BIT;
+  sFilterConfig.FilterIdHigh         = can_rx_id << 5;
+  sFilterConfig.FilterIdLow          = 0x0000;
+  sFilterConfig.FilterMaskIdHigh     = 0b11111111111 << 5;
+  sFilterConfig.FilterMaskIdLow      = 0x0000;
   sFilterConfig.FilterFIFOAssignment = motorId % 2 == 0 ? CAN_RX_FIFO0 : CAN_RX_FIFO1;
-  sFilterConfig.FilterActivation = ENABLE;
+  sFilterConfig.FilterActivation     = ENABLE;
   sFilterConfig.SlaveStartFilterBank = 14;
-  this->filterId = this->port->addCanFilter(sFilterConfig);
+  this->filterId                     = this->port->addCanFilter(sFilterConfig);
 }
 
 void RmdCAN::setAddress(uint8_t id) {
@@ -98,16 +98,23 @@ void RmdCAN::registerCommands() {
   registerCommand("connected", RmdCAN_commands::connected, "Rmd connection state", CMDFLAG_GET);
   registerCommand("voltage", RmdCAN_commands::voltage, "Rmd voltage", CMDFLAG_GET);
   registerCommand("single_pos", RmdCAN_commands::single_pos, "Rmd read single-turn encoder command", CMDFLAG_GET);
+  registerCommand("single_offset", RmdCAN_commands::single_offset, "Rmd read single-turn zero offset", CMDFLAG_GET);
   registerCommand("multi_pos", RmdCAN_commands::multi_pos, "Rmd read multi-turn encoder command", CMDFLAG_GET);
   registerCommand("single_ang", RmdCAN_commands::single_ang, "Rmd read single-turn angle command", CMDFLAG_GET);
   registerCommand("multi_ang", RmdCAN_commands::multi_ang, "Rmd read multi-turn angle command", CMDFLAG_GET);
-  registerCommand("epos", RmdCAN_commands::encpos, "Rmd multi-turn relative position (pulses)", CMDFLAG_GET);
-  registerCommand("homepos", RmdCAN_commands::homepos, "Rmd multi-turn home position (pulses)", CMDFLAG_GET);
-  registerCommand("zoff", RmdCAN_commands::zerooffset, "Rmd multi-turn zero offset (pulses)", CMDFLAG_GET);
+  registerCommand("pos_turns", RmdCAN_commands::pos_turns, "Rmd multi-turn relative position (turns)", CMDFLAG_GET);
+  registerCommand("pos_turns_offset", RmdCAN_commands::pos_turns_offset, "Get the internally stored offset (turns)",
+                  CMDFLAG_GET);
+  registerCommand("multi_pos_raw", RmdCAN_commands::multi_pos_raw, "Rmd multi-turn raw position (pulses)", CMDFLAG_GET);
+  registerCommand("multi_offset", RmdCAN_commands::multi_offset, "Rmd multi-turn zero offset (pulses)",
+                  CMDFLAG_GET | CMDFLAG_SET);
+  registerCommand("start", RmdCAN_commands::start, "Start the Rmd motor", CMDFLAG_SET);
+  registerCommand("stop", RmdCAN_commands::stop, "Stop the Rmd motor", CMDFLAG_SET);
+  registerCommand("baudrate", RmdCAN_commands::baudrate, "Rmd set baudrates for RS485/CAN", CMDFLAG_SET);
+  registerCommand("function", RmdCAN_commands::function, "Rmd function command. Takes a control value.", CMDFLAG_SET);
   registerCommand("apos", RmdCAN_commands::abspos, "Rmd abs position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("ipos", RmdCAN_commands::incpos, "Rmd inc position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("spd", RmdCAN_commands::spd, "Rmd speed closed loop command", CMDFLAG_GET | CMDFLAG_SET);
-  registerCommand("trackpos", RmdCAN_commands::trackpos, "Rmd pos tracking command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("torque", RmdCAN_commands::torque, "Rmd current torque (A)", CMDFLAG_GET);
 
   registerCommand("debug", RmdCAN_commands::debug, "debugging_data", CMDFLAG_GET);
@@ -142,39 +149,28 @@ void RmdCAN::saveFlash() {
 
 void RmdCAN::Run() {
   while (true) {
-    this->Delay(500);
+    this->Delay(250);
 
     if (motor_error != RmdError::none) {
       this->motorOff();
       motor_error = RmdError::none;
-      state = RmdLocalState::IDLE;
+      // state       = RmdLocalState::IDLE;
       this->Delay(1000);
       continue;
     }
     switch (state) {
       case RmdLocalState::IDLE:
-        sendCmd(RmdCmd::read_multiturn_position);
-        sendCmd(RmdCmd::read_multiturn_angle);
-        this->Delay(500);
-        setPos(0);
+        // sendCmd(RmdCmd::read_multiturn_position);
+        // sendCmd(RmdCmd::read_multiturn_angle);
+        // setPos(0);
         state = RmdLocalState::WAIT_READY;
         break;
 
       case RmdLocalState::WAIT_READY:
         break;
 
-      case RmdLocalState::WAIT_HOMING:
-        break;
-
-      case RmdLocalState::WAIT_HOMING_DONE:
-        state = RmdLocalState::START_RUNNING;
-
       case RmdLocalState::START_RUNNING:
-        state = RmdLocalState::RUNNING;
-        // driver is active,
-        // enable torque mode
-        // this->getPosOffset();
-        this->startMotor();
+        startMotor();
         break;
 
       default:
@@ -188,7 +184,7 @@ void RmdCAN::Run() {
     }
 
     if (HAL_GetTick() - lastCanMessage > 2000) {  // Timeout
-      state = RmdLocalState::IDLE;
+      state     = RmdLocalState::IDLE;
       connected = false;
     } else {
       connected = true;
@@ -199,23 +195,28 @@ void RmdCAN::Run() {
 void RmdCAN::motorOff() {
   active = false;
   sendCmd(RmdCmd::motor_shutdown);
+  state = RmdLocalState::IDLE;
 }
 
 void RmdCAN::stopMotor() {
-  // Temporarily calling "motor_shutdown" instead as I am unsure if this is a hard stop or should
-  // stop closed loop calculation
   active = false;
   this->setTorque(0.0);
-  this->Delay(5);
-  sendCmd(RmdCmd::motor_stop);
-  this->Delay(5);
+  this->Delay(10);
   this->motorOff();
 }
 
 void RmdCAN::startMotor() {
-  active = true;
-  this->setTorque(0.0);
+  if (!suspend) {
+    active = true;
+    state  = RmdLocalState::RUNNING;
+    this->Delay(1);
+    this->setTorque(0.0);
+  }
 }
+
+void RmdCAN::suspendAxis(bool flag) { suspend = flag; }
+
+bool RmdCAN::isSuspended() { return suspend; }
 
 bool RmdCAN::motorReady() { return (this->connected && state == RmdLocalState::RUNNING); }
 
@@ -235,20 +236,20 @@ void RmdCAN::resetPID() {
 
 void RmdCAN::sendCmd(RmdCmd cmd) {
   uint8_t buffer[8] = {0};
-  buffer[0] = (uint8_t)cmd;
+  buffer[0]         = (uint8_t)cmd;
   this->sendMsg(buffer);
 }
 
 void RmdCAN::sendMsg(uint8_t *buffer) {
   CAN_tx_msg msg;
 
-  msg.header.RTR = CAN_RTR_DATA;
-  msg.header.DLC = 8;
-  msg.header.IDE = 0;
+  msg.header.RTR   = CAN_RTR_DATA;
+  msg.header.DLC   = 8;
+  msg.header.IDE   = 0;
   msg.header.StdId = outgoing_base_id + canId;
   memcpy(&msg.data, buffer, 8 * sizeof(uint8_t));
 
-  this->_debug.lastOutCmd = buffer[0];
+  this->_debug.lastOutCmd     = buffer[0];
   this->_debug.lastOutAddress = msg.header.StdId;
 
   if (!port->sendMessage(msg)) {
@@ -262,7 +263,7 @@ void RmdCAN::canErrorCallback(CAN_HandleTypeDef *hcan) {
 
 void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHeaderTypeDef *rxHeader, uint32_t fifo) {
   this->_debug.lastInAddress = rxHeader->StdId;
-  this->_debug.lastInCmd = rxBuf[0];
+  this->_debug.lastInCmd     = rxBuf[0];
 
   uint16_t canNodeId = rxHeader->StdId - incoming_base_id;
 
@@ -274,82 +275,67 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
   lastCanMessage = HAL_GetTick();
 
   switch (cmd) {
-    case RmdCmd::read_singleturn_position:  // 0x90
-    {
-      float epos = static_cast<float>(buffer_get_int16(rxBuf, 2));
-      float cpr = getCpr();
-      this->lastPos = static_cast<float>(epos / cpr);
-      this->lastPosTime = HAL_GetTick();
-      this->posWaiting = false;
-      break;
-    }
-
     case RmdCmd::read_multiturn_position:  // 0x60
     {
-      float epos = static_cast<float>(buffer_get_int32(rxBuf, 4));
-      float cpr = getCpr();
-      this->lastPos = static_cast<float>(epos / cpr);
-      this->lastPosTime = HAL_GetTick();
-      this->posWaiting = false;
+      this->multiturnEncPos = buffer_get_int32(rxBuf, 4);
+      float epos            = static_cast<float>(multiturnEncPos);
+      float cpr             = getCpr();
+      this->lastPos         = static_cast<float>(epos / cpr);
+      this->lastPosTime     = HAL_GetTick();
+      this->posWaiting      = false;
       break;
     }
 
-    case RmdCmd::read_home_position:  // 0x61
+    case RmdCmd::read_multiturn_position_raw:  // 0x61
     {
-      this->homePos = buffer_get_int32(rxBuf, 4);
+      this->multiturnEncPosRaw = buffer_get_int32(rxBuf, 4);
       break;
     }
 
-    case RmdCmd::read_zero_offset:  // 0x62
+    case RmdCmd::read_multiturn_zero_offset:  // 0x62
     {
-      // this->posOffset = buffer_get_int32(rxBuf, 4);
+      this->multiturnEncZeroOffset = buffer_get_int32(rxBuf, 4);
       break;
     }
 
     case RmdCmd::system_operating_mode:  // 0x70
     {
-      this->axisState = static_cast<RmdControlMode>(buffer_get_uint8(rxBuf, 7));
+      this->axisState = static_cast<RmdAxisState>(buffer_get_uint8(rxBuf, 7));
       break;
     }
 
-    case RmdCmd::torque_closed_loop:  // 0xA1
+    case RmdCmd::torque_control:  // 0xA1
     {
       this->currentTorque = buffer_get_int16(rxBuf, 2);
       break;
     }
 
-    case RmdCmd::speed_closed_loop:  // 0xA2
+    case RmdCmd::speed_control:  // 0xA2
     {
       /* 1 dps/LSB precision */
       this->lastSpeed = buffer_get_int16(rxBuf, 4);
       break;
     }
 
-    case RmdCmd::pos_tracking_control:  // 0xA3
+    case RmdCmd::abs_pos_control:  // 0xA4
     {
       /* 1 dps/LSB precision */
       this->lastSpeed = buffer_get_int16(rxBuf, 4);
       break;
     }
 
-    case RmdCmd::abs_pos_closed_loop:  // 0xA4
+    case RmdCmd::inc_pos_control:  // 0xA8
     {
       /* 1 dps/LSB precision */
       this->lastSpeed = buffer_get_int16(rxBuf, 4);
       break;
     }
 
-    case RmdCmd::inc_pos_closed_loop:  // 0xA8
+    case RmdCmd::read_singleturn_position:  // 0x90
     {
-      /* 1 dps/LSB precision */
-      this->lastSpeed = buffer_get_int16(rxBuf, 4);
-      break;
-    }
-
-    case RmdCmd::read_singleturn_angle:  // 0x94
-    {
-      /* 0.01 deg/LSB precision, leave as-is for now */
-      this->lastAng = buffer_get_int16(rxBuf, 6);
+      this->singleturnEncPos        = buffer_get_int16(rxBuf, 2);
+      this->singleturnEncPosRaw     = buffer_get_int16(rxBuf, 4);
+      this->singleturnEncZeroOffset = buffer_get_int16(rxBuf, 6);
       break;
     }
 
@@ -360,11 +346,18 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
       break;
     }
 
+    case RmdCmd::read_singleturn_angle:  // 0x94
+    {
+      /* 0.01 deg/LSB precision, leave as-is for now */
+      this->lastAng = buffer_get_int16(rxBuf, 6);
+      break;
+    }
+
     case RmdCmd::read_status_1:  // 0x9A
     {
       this->motor_error = static_cast<RmdError>(buffer_get_uint16(rxBuf, 6));
       if (motor_error != RmdError::none) {
-        state = RmdLocalState::IDLE;
+        // state = RmdLocalState::IDLE;
       }
       lastVoltageUpdate = HAL_GetTick();
       this->lastVoltage = (float)buffer_get_uint16(rxBuf, 4);
@@ -396,8 +389,8 @@ void RmdCAN::setPos(int32_t pos) {
 float RmdCAN::getPos_f() {
   if (motorReady() && (!posWaiting || HAL_GetTick() - lastPosTime > 5)) {
     posWaiting = true;
+    this->Delay(1);
     sendCmd(RmdCmd::read_multiturn_position);
-    sendCmd(RmdCmd::read_multiturn_angle);
   }
   return lastPos - posOffset;
 }
@@ -412,14 +405,15 @@ uint32_t RmdCAN::getCpr() { return 16384; }
  */
 void RmdCAN::turn(int16_t power) {
   float torque = ((float)power / (float)0x7FFF) * maxTorque;  // 0x7FFF is the int16_t max.
-  this->setTorque(torque);                                    // Send the signed torque(max of 1.0, min of -1.0)
+  this->Delay(1);
+  this->setTorque(torque);  // Send the signed torque(max of 1.0, min of -1.0)
 }
 
 // Input must be between -1.0 and 1.0
 void RmdCAN::setTorque(float torque) {
   if (motorReady()) {
     uint8_t buffer[8] = {0};
-    buffer[0] = (uint8_t)RmdCmd::torque_closed_loop;
+    buffer[0]         = (uint8_t)RmdCmd::torque_control;
     int16_t output_torque;
     if (torque == 0.0)
       output_torque = 0;
@@ -435,8 +429,8 @@ void RmdCAN::setTorque(float torque) {
 void RmdCAN::moveToPosition(float posDegrees) {
   //   if (motorReady()) {
   uint8_t buffer[8] = {0};
-  buffer[0] = (uint8_t)RmdCmd::abs_pos_closed_loop;  // 0xA4
-  uint16_t maxspd = 100;
+  buffer[0]         = (uint8_t)RmdCmd::abs_pos_control;  // 0xA4
+  uint16_t maxspd   = 100;
   buffer_append_uint16(buffer, maxspd, 2);
   /* posDegrees is assumed to be in deg,
   and precision is 0.01 deg/LSB */
@@ -449,68 +443,200 @@ void RmdCAN::moveToPosition(float posDegrees) {
 void RmdCAN::executeMotionPlan(float pos, float vel, float kp, float kd, float t_ff) {
   uint8_t buffer[8] = {0};
 
-  float pos_rad = pos * PI_F / 180.0f;
-  const float pos_offset = -12.5f;   // rad
-  const float pos_maxRange = 25.0f;  // rad
+  float pos_rad            = pos * PI_F / 180.0f;
+  const float pos_offset   = -12.5f;  // rad
+  const float pos_maxRange = 25.0f;   // rad
 
   uint16_t pos_i = (pos_rad - pos_offset) / pos_maxRange * 0xFFFF;
 
-  const float vel_offset = -45.0f;   // rad/s
-  const float vel_maxRange = 90.0f;  // rad/s
+  const float vel_offset   = -45.0f;  // rad/s
+  const float vel_maxRange = 90.0f;   // rad/s
+
+  uint16_t vel_i = 0;
 
   const float kp_max = 500.0f;
+
+  uint16_t kp_i = 0;
+
   const float kd_max = 5.0f;
 
-  const float t_offset = -24.0f;   // N.m
-  const float t_maxRange = 48.0f;  // N.m
+  uint16_t kd_i = 0;
+
+  const float torq_offset   = -24.0f;  // N.m
+  const float torq_maxRange = 48.0f;   // N.m
+
+  uint16_t torq_i;
+
+  // Now we do the nibble packing!
+
+  // Need to use the custom can id 0x400
+  CAN_tx_msg msg;
+
+  msg.header.RTR   = CAN_RTR_DATA;
+  msg.header.DLC   = 8;
+  msg.header.IDE   = 0;
+  msg.header.StdId = motion_command_base_id + canId;
+  memcpy(&msg.data, buffer, 8 * sizeof(uint8_t));
+
+  if (!port->sendMessage(msg)) {
+    // Nothing.
+  };
+}
+
+void RmdCAN::setBaudrates(uint8_t value) {
+  uint8_t buffer[8] = {0};
+  buffer[0]         = (uint8_t)RmdCmd::set_communication_baudrate;  // 0xB4
+  buffer[7]         = value;
+  sendMsg(buffer);
+}
+
+void RmdCAN::sendFunctionCmd(RmdFunctionControl fnc) {
+  uint8_t buffer[8] = {0};
+  buffer[0]         = (uint8_t)RmdCmd::function_command;  // 0x20
+  buffer[1]         = (uint8_t)fnc;
+  sendMsg(buffer);
+}
+
+void RmdCAN::writeAccelerationPlanParameters(float maxPosAccel, float maxPosDecel, float maxVelAccel,
+                                             float maxVelDecel) {
+  uint8_t buffer[8] = {0};
+  buffer[0]         = (uint8_t)RmdCmd::write_acceleration;
+
+  buffer[1] = 0x00;
+  buffer_append_uint32(buffer, maxPosAccel, 4);
+  sendMsg(buffer);
+
+  this->Delay(1);
+  buffer[1] = 0x01;
+  buffer_append_uint32(buffer, maxPosDecel, 4);
+  sendMsg(buffer);
+
+  this->Delay(1);
+  buffer[1] = 0x02;
+  buffer_append_uint32(buffer, maxVelAccel, 4);
+  sendMsg(buffer);
+
+  this->Delay(1);
+  buffer[1] = 0x03;
+  buffer_append_uint32(buffer, maxVelDecel, 4);
+  sendMsg(buffer);
 }
 
 CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply> &replies) {
   switch (static_cast<RmdCAN_commands>(cmd.cmdId)) {
+    // Different cases
+    case RmdCAN_commands::single_pos:  // 0x90
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        sendCmd(RmdCmd::read_singleturn_position);
+        replies.emplace_back(this->singleturnEncPos);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
 
-	case RmdCAN_commands::single_pos:
-	{
-		if (cmd.type == CMDtype::get) {
-			sendCmd(RmdCmd::read_singleturn_position);
-			replies.emplace_back(this->lastPos);
-		} else {
-			return CommandStatus::ERR;
-		}
-		break;
-	}
+    case RmdCAN_commands::single_offset:  // helper command
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        replies.emplace_back(this->singleturnEncZeroOffset);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
 
-	case RmdCAN_commands::single_ang:
-	{
-		if (cmd.type == CMDtype::get) {
-			sendCmd(RmdCmd::read_singleturn_angle);
-			replies.emplace_back(this->lastAng / 9);
-		} else {
-			return CommandStatus::ERR;
-		}
-		break;
-	}
+    case RmdCAN_commands::multi_ang:  // 0x92
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        sendCmd(RmdCmd::read_multiturn_angle);
+        replies.emplace_back(this->lastAng);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
 
-	case RmdCAN_commands::multi_pos:
-	{
-		if (cmd.type == CMDtype::get) {
-			sendCmd(RmdCmd::read_multiturn_position);
-			replies.emplace_back(this->lastPos);
-		} else {
-			return CommandStatus::ERR;
-		}
-		break;
-	}
+    case RmdCAN_commands::single_ang:  // 0x94
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        sendCmd(RmdCmd::read_singleturn_angle);
+        replies.emplace_back(this->lastAng / 9);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
 
-	case RmdCAN_commands::multi_ang:
-	{
-		if (cmd.type == CMDtype::get) {
-			sendCmd(RmdCmd::read_multiturn_angle);
-			replies.emplace_back(this->lastAng);
-		} else {
-			return CommandStatus::ERR;
-		}
-		break;
-	}
+    case RmdCAN_commands::multi_pos:  // 0x60
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        sendCmd(RmdCmd::read_multiturn_position);
+        replies.emplace_back(this->multiturnEncPos);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::multi_pos_raw:  // 0x61
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        sendCmd(RmdCmd::read_multiturn_position_raw);
+        replies.emplace_back(this->multiturnEncPosRaw);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::multi_offset:  // 0x62
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        sendCmd(RmdCmd::read_multiturn_zero_offset);
+        replies.emplace_back(this->multiturnEncZeroOffset);
+      } else if (cmd.type == CMDtype::set) {
+        sendCmd(RmdCmd::write_multiturn_position);
+        this->Delay(1);
+        sendCmd(RmdCmd::system_reset);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::baudrate:
+      this->Delay(1);
+      if (cmd.type == CMDtype::set) {
+        setBaudrates(static_cast<uint8_t>(cmd.val));
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::function:
+      this->Delay(1);
+      if (cmd.type == CMDtype::set) {
+        sendFunctionCmd(static_cast<RmdFunctionControl>(cmd.val));
+        this->Delay(1);
+        sendCmd(RmdCmd::system_reset);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::start:
+      this->Delay(1);
+      if (cmd.type == CMDtype::set) {
+        suspendAxis(false);
+        state = RmdLocalState::START_RUNNING;
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::stop:
+      this->Delay(1);
+      if (cmd.type == CMDtype::set) {
+        suspendAxis(true);
+        stopMotor();
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
 
     case RmdCAN_commands::canid:
       if (cmd.type == CMDtype::get) {
@@ -543,6 +669,7 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       break;
 
     case RmdCAN_commands::state:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
         replies.emplace_back((uint32_t)state);
       } else if (cmd.type == CMDtype::set) {
@@ -553,6 +680,7 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       break;
 
     case RmdCAN_commands::maxtorque:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
         int32_t val = maxTorque * 100;
         replies.emplace_back(val);
@@ -564,12 +692,14 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       break;
 
     case RmdCAN_commands::connected:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(connected ? 1 : 0);
       }
       break;
 
     case RmdCAN_commands::voltage:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(lastVoltage);
       } else {
@@ -577,40 +707,41 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       }
       break;
 
-    case RmdCAN_commands::encpos:
+    case RmdCAN_commands::pos_turns:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
-        float pos = lastPos;
-        replies.emplace_back(pos);
+        replies.emplace_back(lastPos * 10000);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::pos_turns_offset:
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        replies.emplace_back(posOffset * 10000);
+      } else {
+        return CommandStatus::ERR;
       }
       break;
 
     case RmdCAN_commands::torque:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(this->currentTorque);
-      }
-      break;
-
-    case RmdCAN_commands::homepos:
-      if (cmd.type == CMDtype::get) {
-        sendCmd(RmdCmd::read_home_position);
-        replies.emplace_back((int32_t)this->homePos);
-      }
-      break;
-
-    case RmdCAN_commands::zerooffset:
-      if (cmd.type == CMDtype::get) {
-        sendCmd(RmdCmd::read_zero_offset);
-        replies.emplace_back(this->posOffset);
+      } else {
+        return CommandStatus::ERR;
       }
       break;
 
     case RmdCAN_commands::abspos:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(lastAng - angOffset);
       } else if (cmd.type == CMDtype::set) {
-        this->moveToPosition(cmd.val);
-        this->Delay(750);
-        sendCmd(RmdCmd::motor_shutdown);
+        // this->moveToPosition(cmd.val);
+        // this->Delay(750);
+        // sendCmd(RmdCmd::motor_shutdown);
       }
       break;
 
@@ -620,8 +751,8 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       } else if (cmd.type == CMDtype::set) {
         if (motorReady()) {
           uint8_t buffer[8] = {0};
-          buffer[0] = (uint8_t)RmdCmd::inc_pos_closed_loop;
-          uint16_t maxspd = 250;
+          buffer[0]         = (uint8_t)RmdCmd::inc_pos_control;
+          uint16_t maxspd   = 250;
           buffer_append_uint16(buffer, maxspd, 2);
           /* cmd.val is assumed to be in deg,
           and precision is 0.01 deg/LSB */
@@ -638,27 +769,11 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       } else if (cmd.type == CMDtype::set) {
         if (motorReady()) {
           uint8_t buffer[8] = {0};
-          buffer[0] = (uint8_t)RmdCmd::speed_closed_loop;
+          buffer[0]         = (uint8_t)RmdCmd::speed_control;
           /* cmd.val is assumed to be in dps,
           and precision is 0.01 dps/LSB */
           int32_t spd = cmd.val * 100;
           buffer_append_int32(buffer, spd, 4);
-          sendMsg(buffer);
-        }
-      }
-      break;
-
-    case RmdCAN_commands::trackpos:
-      if (cmd.type == CMDtype::get) {
-        break;
-      } else if (cmd.type == CMDtype::set) {
-        if (motorReady()) {
-          uint8_t buffer[8] = {0};
-          buffer[0] = (uint8_t)RmdCmd::pos_tracking_control;
-          /* cmd.val is assumed to be in deg,
-          and precision is 0.01 deg/LSB */
-          int32_t pos = cmd.val * 100;
-          buffer_append_int32(buffer, pos, 4);
           sendMsg(buffer);
         }
       }
@@ -681,8 +796,8 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
 }
 
 float normalize(float input, float min, float max) {
-  float average = (min + max) / 2;
-  float range = (max - min) / 2;
+  float average      = (min + max) / 2;
+  float range        = (max - min) / 2;
   float normalized_x = (input - average) / range;
   return normalized_x;
 }

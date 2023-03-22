@@ -282,6 +282,10 @@ void Axis::prepareForUpdate(){
 		return;
 	}
 
+	// checkSuspendUpdate();
+#ifdef RMD
+	if (!drv->motorReady()) return;
+#endif
 	//if (!drv->motorReady()) return;
 
 	float angle = getEncAngle(this->drv->getEncoder());
@@ -415,6 +419,23 @@ void Axis::setupTMC4671()
 }
 #endif
 
+#ifdef RMD
+// Special method for pausing control
+void Axis::checkSuspendUpdate()
+{
+	RmdCAN *drv = static_cast<RmdCAN *>(this->drv.get());
+	if(drv->isSuspended())
+	{
+		if(!suspendFired) {
+			suspendFired = true;
+			control->request_update_disabled = true;
+		}
+	} else {
+		suspendFired = false;
+		control->update_disabled = false;
+	}
+}
+#endif
 
 /**
  * Init the encoder and reset metrics

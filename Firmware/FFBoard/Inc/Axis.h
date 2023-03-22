@@ -101,6 +101,11 @@ public:
 #ifdef TMC4671DRIVER
 	void setupTMC4671();
 #endif
+
+#ifdef RMD
+	void checkSuspendUpdate();
+#endif
+
 	// Dynamic classes
 	void setDrvType(uint8_t drvtype);
 	void setEncType(uint8_t enctype);
@@ -167,6 +172,10 @@ private:
 
 	AxisFlashAddrs flashAddrs;
 	volatile Control_t* control;
+
+#ifdef RMD
+	volatile bool suspendFired = false;
+#endif	
 
 	//TIM_HandleTypeDef *timer_update;
 	AxisConfig conf;
