@@ -401,7 +401,7 @@ void RmdCAN::setPos(int32_t pos) {
 float RmdCAN::getPos_f() {
   if (motorReady() && (!posWaiting || HAL_GetTick() - lastPosTime > 5)) {
     posWaiting = true;
-    this->Delay(1);
+    // this->Delay(1);
     sendCmd(RmdCmd::read_multiturn_position);
   }
   return lastPos - posOffset;
@@ -417,7 +417,7 @@ uint32_t RmdCAN::getCpr() { return 16384; }
  */
 void RmdCAN::turn(int16_t power) {
   float torque = ((float)power / (float)0x7FFF) * maxTorque;  // 0x7FFF is the int16_t max.
-  this->Delay(1);
+  // this->Delay(1);
   this->setTorque(torque);  // Send the signed torque(max of 1.0, min of -1.0)
 }
 
@@ -508,6 +508,8 @@ void RmdCAN::sendFunctionCmd(RmdFunctionControl fnc) {
   buffer[1]         = (uint8_t)fnc;
   sendMsg(buffer);
 }
+
+
 
 void RmdCAN::writeAccelerationPlanParameters(float maxPosAccel, float maxPosDecel, float maxVelAccel,
                                              float maxVelDecel) {
@@ -656,9 +658,8 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
         sendCmd(RmdCmd::read_pid);
         replies.emplace_back((uint64_t)(pidSettings));
       } else if (cmd.type == CMDtype::set) {
-        // sendCmd(RmdCmd::write_multiturn_position);
-        // this->Delay(1);
-        // sendCmd(RmdCmd::system_reset);
+        pidSettings = (uint64_t)cmd.val;
+        writePID();
       } else {
         return CommandStatus::ERR;
       }
@@ -891,6 +892,13 @@ uint64_t ByteArrayToInt(const uint8_t *buffer, int length) {
     recoveredValue |= byteVal;
   }
   return recoveredValue;
+}
+
+// Convert long long to byte array
+void IntToByteArray(const uint64_t value, uint8_t *buffer, int length) {
+  for (int i = 0; i < length; i++) {
+    buffer[i] = ((value >> (8 * i)) & 0XFF);
+  }
 }
 
 #endif

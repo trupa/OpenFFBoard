@@ -23,19 +23,34 @@
 #define RMD_THREAD_MEM 512
 #define RMD_THREAD_PRIO 25  // Must be higher than main thread
 
-uint64_t ByteArrayToInt( const uint8_t *buffer, int length );
+uint64_t ByteArrayToInt(const uint8_t *buffer, int length);
+void IntToByteArray(const uint64_t value, uint8_t *buffer, int length);
 struct RmdPIDSettings {
 
+  // Conversion to uint64_t
   explicit operator uint64_t() {
     uint8_t buffer[6] = {0};
-    buffer[0] = CurrentKp;
-    buffer[1] = CurrentKi;
-    buffer[2] = SpeedKp;
-    buffer[3] = SpeedKi;
-    buffer[4] = PositionKp;
-    buffer[5] = PositionKi;
-    uint64_t result = ByteArrayToInt( buffer, 6 );
+    buffer[0]         = CurrentKp;
+    buffer[1]         = CurrentKi;
+    buffer[2]         = SpeedKp;
+    buffer[3]         = SpeedKi;
+    buffer[4]         = PositionKp;
+    buffer[5]         = PositionKi;
+    uint64_t result   = ByteArrayToInt(buffer, 6);
     return result;
+  }
+
+  RmdPIDSettings() = default;
+   // Converting ctor from uint64_t
+  RmdPIDSettings(uint64_t val) {
+    uint8_t buffer[6] = {0};
+    IntToByteArray(val, buffer, 6);
+    CurrentKp  = buffer[0];
+    CurrentKi  = buffer[1];
+    SpeedKp    = buffer[2];
+    SpeedKi    = buffer[3];
+    PositionKp = buffer[4];
+    PositionKi = buffer[5];
   }
 
   uint8_t CurrentKp;   // Current Kp
@@ -231,7 +246,7 @@ class RmdCAN : public MotorDriver,
   int16_t singleturnEncPosRaw     = 0; /* counts */
   int16_t singleturnEncZeroOffset = 0; /* counts */
 
-  RmdPIDSettings pidSettings = RmdPIDSettings{};
+  RmdPIDSettings pidSettings;
 
   int32_t lastAng   = 0; /* deg */
   int32_t angOffset = 0; /* deg */
@@ -268,8 +283,8 @@ class RmdCAN : public MotorDriver,
 
   volatile bool suspend = true;
 
-  volatile RmdLocalState state        = RmdLocalState::IDLE;
-  volatile RmdAxisState axisState     = RmdAxisState::IDLE;
+  volatile RmdLocalState state    = RmdLocalState::IDLE;
+  volatile RmdAxisState axisState = RmdAxisState::IDLE;
 
   volatile RmdError motor_error = RmdError::none;
   // Not yet used by rmd (0.5.4):
