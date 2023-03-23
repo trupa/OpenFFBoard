@@ -23,13 +23,27 @@
 #define RMD_THREAD_MEM 512
 #define RMD_THREAD_PRIO 25  // Must be higher than main thread
 
-enum class RmdPIDSettings : uint8_t {
-  CurrentKp  = 0x19,  // Current Kp
-  CurrentKi  = 0x19,  // Current Ki
-  SpeedKp    = 0x09,  // Speed Kp
-  SpeedKi    = 0x09,  // Speed Ki
-  PositionKp = 0x19,  // Position Kp
-  PositionKi = 0x19,  // Position Ki
+uint64_t ByteArrayToInt( const uint8_t *buffer, int length );
+struct RmdPIDSettings {
+
+  explicit operator uint64_t() {
+    uint8_t buffer[6] = {0};
+    buffer[0] = CurrentKp;
+    buffer[1] = CurrentKi;
+    buffer[2] = SpeedKp;
+    buffer[3] = SpeedKi;
+    buffer[4] = PositionKp;
+    buffer[5] = PositionKi;
+    uint64_t result = ByteArrayToInt( buffer, 6 );
+    return result;
+  }
+
+  uint8_t CurrentKp;   // Current Kp
+  uint8_t CurrentKi;   // Current Ki
+  uint8_t SpeedKp;     // Speed Kp
+  uint8_t SpeedKi;     // Speed Ki
+  uint8_t PositionKp;  // Position Kp
+  uint8_t PositionKi;  // Position Ki
 };
 
 enum class RmdAxisState : uint8_t {
@@ -124,6 +138,7 @@ enum class RmdCAN_commands : uint32_t {
   function,
   start,
   stop,
+  pid,
   abspos,
   incpos,
   spd,
@@ -195,7 +210,7 @@ class RmdCAN : public MotorDriver,
   void executeMotionPlan(float posRadians, float velRadPerSecond, float kp, float kd, float torque_ff);
   void writeAccelerationPlanParameters(float maxPosAccel, float maxPosDecel, float maxVelAccel, float maxVelDecel);
   void readyCb();
-  void resetPID();
+  void writePID();
 
   void setMode(RmdAxisState controlMode);
 
@@ -215,6 +230,8 @@ class RmdCAN : public MotorDriver,
   int16_t singleturnEncPos        = 0; /* counts */
   int16_t singleturnEncPosRaw     = 0; /* counts */
   int16_t singleturnEncZeroOffset = 0; /* counts */
+
+  RmdPIDSettings pidSettings = RmdPIDSettings{};
 
   int32_t lastAng   = 0; /* deg */
   int32_t angOffset = 0; /* deg */
@@ -251,8 +268,8 @@ class RmdCAN : public MotorDriver,
 
   volatile bool suspend = true;
 
-  volatile RmdLocalState state    = RmdLocalState::IDLE;
-  volatile RmdAxisState axisState = RmdAxisState::IDLE;
+  volatile RmdLocalState state        = RmdLocalState::IDLE;
+  volatile RmdAxisState axisState     = RmdAxisState::IDLE;
 
   volatile RmdError motor_error = RmdError::none;
   // Not yet used by rmd (0.5.4):

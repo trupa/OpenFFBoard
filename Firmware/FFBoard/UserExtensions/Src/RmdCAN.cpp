@@ -112,6 +112,7 @@ void RmdCAN::registerCommands() {
   registerCommand("stop", RmdCAN_commands::stop, "Stop the Rmd motor", CMDFLAG_SET);
   registerCommand("baudrate", RmdCAN_commands::baudrate, "Rmd set baudrates for RS485/CAN", CMDFLAG_SET);
   registerCommand("function", RmdCAN_commands::function, "Rmd function command. Takes a control value.", CMDFLAG_SET);
+  registerCommand("pid", RmdCAN_commands::pid, "Rmd get/set PID values", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("apos", RmdCAN_commands::abspos, "Rmd abs position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("ipos", RmdCAN_commands::incpos, "Rmd inc position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("spd", RmdCAN_commands::spd, "Rmd speed closed loop command", CMDFLAG_GET | CMDFLAG_SET);
@@ -220,16 +221,17 @@ bool RmdCAN::isSuspended() { return suspend; }
 
 bool RmdCAN::motorReady() { return (this->connected && state == RmdLocalState::RUNNING); }
 
-void RmdCAN::resetPID() {
-  uint8_t data[8];
-  data[0] = 0x32;                                 // Command
-  data[1] = 0x00;                                 // Null
-  data[2] = (uint8_t)RmdPIDSettings::CurrentKp;   // Current Kp
-  data[3] = (uint8_t)RmdPIDSettings::CurrentKi;   // Current Ki
-  data[4] = (uint8_t)RmdPIDSettings::SpeedKp;     // Speed Kp
-  data[5] = (uint8_t)RmdPIDSettings::SpeedKi;     // Speed Ki
-  data[6] = (uint8_t)RmdPIDSettings::PositionKp;  // Position Kp
-  data[7] = (uint8_t)RmdPIDSettings::PositionKi;  // Position Ki
+void RmdCAN::writePID() {
+  uint8_t data[8] = {0};
+
+  data[0] = (uint8_t)RmdCmd::write_pid_ram;  // Command
+
+  data[2] = pidSettings.CurrentKp;   // Current Kp
+  data[3] = pidSettings.CurrentKi;   // Current Ki
+  data[4] = pidSettings.SpeedKp;     // Speed Kp
+  data[5] = pidSettings.SpeedKi;     // Speed Ki
+  data[6] = pidSettings.PositionKp;  // Position Kp
+  data[7] = pidSettings.PositionKi;  // Position Ki
 
   this->sendMsg(data);
 }
@@ -362,6 +364,16 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
       lastVoltageUpdate = HAL_GetTick();
       this->lastVoltage = (float)buffer_get_uint16(rxBuf, 4);
       break;
+    }
+
+    case RmdCmd::read_pid:  // 0x30
+    {
+      pidSettings.CurrentKp  = rxBuf[2];
+      pidSettings.CurrentKi  = rxBuf[3];
+      pidSettings.SpeedKp    = rxBuf[4];
+      pidSettings.SpeedKi    = rxBuf[5];
+      pidSettings.PositionKp = rxBuf[6];
+      pidSettings.PositionKi = rxBuf[7];
     }
 
     default:
@@ -638,6 +650,20 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       }
       break;
 
+    case RmdCAN_commands::pid:  // 0x30 / 0x31
+      this->Delay(1);
+      if (cmd.type == CMDtype::get) {
+        sendCmd(RmdCmd::read_pid);
+        replies.emplace_back((uint64_t)(pidSettings));
+      } else if (cmd.type == CMDtype::set) {
+        // sendCmd(RmdCmd::write_multiturn_position);
+        // this->Delay(1);
+        // sendCmd(RmdCmd::system_reset);
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
     case RmdCAN_commands::canid:
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(canId);
@@ -853,4 +879,18 @@ uint32_t buffer_get_uint32(const uint8_t *buffer, int32_t index) {
                  ((uint32_t)buffer[index + 1]) << 8 | ((uint32_t)buffer[index]);
   return res;
 }
+
+/* From StackOverflow
+https://stackoverflow.com/questions/43113387/conversion-of-long-long-to-byte-array-and-back-in-c
+*/
+// Convert byte array to long long
+uint64_t ByteArrayToInt(const uint8_t *buffer, int length) {
+  uint64_t recoveredValue = 0;
+  for (int i = 0; i < length; i++) {
+    auto byteVal = ((uint64_t)(buffer[i]) << (8 * i));
+    recoveredValue |= byteVal;
+  }
+  return recoveredValue;
+}
+
 #endif
