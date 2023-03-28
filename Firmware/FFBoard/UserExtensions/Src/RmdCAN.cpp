@@ -113,6 +113,7 @@ void RmdCAN::registerCommands() {
   registerCommand("baudrate", RmdCAN_commands::baudrate, "Rmd set baudrates for RS485/CAN", CMDFLAG_SET);
   registerCommand("function", RmdCAN_commands::function, "Rmd function command. Takes a control value.", CMDFLAG_SET);
   registerCommand("pid", RmdCAN_commands::pid, "Rmd get/set PID values", CMDFLAG_GET | CMDFLAG_SET);
+  registerCommand("motion", RmdCAN_commands::motion, "Rmd issue motion command", CMDFLAG_GET | CMDFLAG_SETADR);
   registerCommand("apos", RmdCAN_commands::abspos, "Rmd abs position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("ipos", RmdCAN_commands::incpos, "Rmd inc position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("spd", RmdCAN_commands::spd, "Rmd speed closed loop command", CMDFLAG_GET | CMDFLAG_SET);
@@ -149,6 +150,7 @@ void RmdCAN::saveFlash() {
 }
 
 void RmdCAN::Run() {
+ 
   while (true) {
     this->Delay(250);
 
@@ -161,9 +163,6 @@ void RmdCAN::Run() {
     }
     switch (state) {
       case RmdLocalState::IDLE:
-        // sendCmd(RmdCmd::read_multiturn_position);
-        // sendCmd(RmdCmd::read_multiturn_angle);
-        // setPos(0);
         state = RmdLocalState::WAIT_READY;
         break;
 
@@ -452,35 +451,9 @@ void RmdCAN::moveToPosition(float posDegrees) {
   //   }
 }
 
-void RmdCAN::executeMotionPlan(float pos, float vel, float kp, float kd, float t_ff) {
-  uint8_t buffer[8] = {0};
-
-  float pos_rad            = pos * PI_F / 180.0f;
-  const float pos_offset   = -12.5f;  // rad
-  const float pos_maxRange = 25.0f;   // rad
-
-  uint16_t pos_i = (pos_rad - pos_offset) / pos_maxRange * 0xFFFF;
-
-  const float vel_offset   = -45.0f;  // rad/s
-  const float vel_maxRange = 90.0f;   // rad/s
-
-  uint16_t vel_i = 0;
-
-  const float kp_max = 500.0f;
-
-  uint16_t kp_i = 0;
-
-  const float kd_max = 5.0f;
-
-  uint16_t kd_i = 0;
-
-  const float torq_offset   = -24.0f;  // N.m
-  const float torq_maxRange = 48.0f;   // N.m
-
-  uint16_t torq_i;
-
-  // Now we do the nibble packing!
-
+void RmdCAN::executeMotionPlan(uint64_t params) {
+ 
+  uint64_t test = 0x7fff7ff0000007ff;
   // Need to use the custom can id 0x400
   CAN_tx_msg msg;
 
@@ -488,7 +461,7 @@ void RmdCAN::executeMotionPlan(float pos, float vel, float kp, float kd, float t
   msg.header.DLC   = 8;
   msg.header.IDE   = 0;
   msg.header.StdId = motion_command_base_id + canId;
-  memcpy(&msg.data, buffer, 8 * sizeof(uint8_t));
+  memcpy(&msg.data, &test, sizeof(uint64_t));
 
   if (!port->sendMessage(msg)) {
     // Nothing.
@@ -508,8 +481,6 @@ void RmdCAN::sendFunctionCmd(RmdFunctionControl fnc) {
   buffer[1]         = (uint8_t)fnc;
   sendMsg(buffer);
 }
-
-
 
 void RmdCAN::writeAccelerationPlanParameters(float maxPosAccel, float maxPosDecel, float maxVelAccel,
                                              float maxVelDecel) {
@@ -660,6 +631,21 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       } else if (cmd.type == CMDtype::set) {
         pidSettings = (uint64_t)cmd.val;
         writePID();
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
+    case RmdCAN_commands::motion:
+      // this->Delay(1);
+      if (cmd.type == CMDtype::setat) {
+        // Combine the two int64_t values into one uint64_t value
+        this->motionBuffer = static_cast<uint64_t>(((uint64_t)cmd.val) | ((uint64_t)(cmd.adr << 32)));
+        executeMotionPlan(motionBuffer);
+        this->Delay(5);
+        motorOff();
+      } else if (cmd.type == CMDtype::get) {
+        replies.emplace_back((uint64_t)this->motionBuffer);
       } else {
         return CommandStatus::ERR;
       }

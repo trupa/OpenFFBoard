@@ -154,6 +154,7 @@ enum class RmdCAN_commands : uint32_t {
   start,
   stop,
   pid,
+  motion,
   abspos,
   incpos,
   spd,
@@ -222,7 +223,7 @@ class RmdCAN : public MotorDriver,
   void motorOff();
   void setTorque(float torque);
   void moveToPosition(float posDegrees);
-  void executeMotionPlan(float posRadians, float velRadPerSecond, float kp, float kd, float torque_ff);
+  void executeMotionPlan(uint64_t params);
   void writeAccelerationPlanParameters(float maxPosAccel, float maxPosDecel, float maxVelAccel, float maxVelDecel);
   void readyCb();
   void writePID();
@@ -245,6 +246,8 @@ class RmdCAN : public MotorDriver,
   int16_t singleturnEncPos        = 0; /* counts */
   int16_t singleturnEncPosRaw     = 0; /* counts */
   int16_t singleturnEncZeroOffset = 0; /* counts */
+
+  uint64_t motionBuffer = 0; /* Used to capture motion data before it is sent */
 
   RmdPIDSettings pidSettings;
 
