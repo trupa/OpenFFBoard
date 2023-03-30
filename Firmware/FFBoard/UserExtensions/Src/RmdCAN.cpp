@@ -110,6 +110,7 @@ void RmdCAN::registerCommands() {
                   CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("start", RmdCAN_commands::start, "Start the Rmd motor", CMDFLAG_SET);
   registerCommand("stop", RmdCAN_commands::stop, "Stop the Rmd motor", CMDFLAG_SET);
+  registerCommand("brake", RmdCAN_commands::brake, "Engage/disengage the Rmd brake", CMDFLAG_SET);
   registerCommand("baudrate", RmdCAN_commands::baudrate, "Rmd set baudrates for RS485/CAN", CMDFLAG_SET);
   registerCommand("function", RmdCAN_commands::function, "Rmd function command. Takes a control value.", CMDFLAG_SET);
   registerCommand("pid", RmdCAN_commands::pid, "Rmd get/set PID values", CMDFLAG_GET | CMDFLAG_SET);
@@ -150,7 +151,6 @@ void RmdCAN::saveFlash() {
 }
 
 void RmdCAN::Run() {
- 
   while (true) {
     this->Delay(250);
 
@@ -438,7 +438,6 @@ void RmdCAN::setTorque(float torque) {
 
 //
 void RmdCAN::moveToPosition(float posDegrees) {
-  //   if (motorReady()) {
   uint8_t buffer[8] = {0};
   buffer[0]         = (uint8_t)RmdCmd::abs_pos_control;  // 0xA4
   uint16_t maxspd   = 100;
@@ -448,12 +447,10 @@ void RmdCAN::moveToPosition(float posDegrees) {
   int32_t absAng = (posDegrees * 100.0 + angOffset);
   buffer_append_int32(buffer, absAng, 4);
   sendMsg(buffer);
-  //   }
 }
 
 void RmdCAN::executeMotionPlan(uint64_t params) {
- 
-  uint64_t test = 0x7fff7ff0000007ff;
+  // uint64_t test = 0x7fff7ff0000007ff;
   // Need to use the custom can id 0x400
   CAN_tx_msg msg;
 
@@ -461,7 +458,8 @@ void RmdCAN::executeMotionPlan(uint64_t params) {
   msg.header.DLC   = 8;
   msg.header.IDE   = 0;
   msg.header.StdId = motion_command_base_id + canId;
-  memcpy(&msg.data, &test, sizeof(uint64_t));
+
+  buffer_append_uint64(msg.data, params);
 
   if (!port->sendMessage(msg)) {
     // Nothing.
@@ -636,14 +634,25 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       }
       break;
 
+    case RmdCAN_commands::brake:
+      this->Delay(1);
+      if (cmd.type == CMDtype::set) {
+        if (cmd.val == 1) {
+          sendCmd(RmdCmd::system_brake_lock);
+        } else {
+          sendCmd(RmdCmd::system_brake_release);
+        }
+      } else {
+        return CommandStatus::ERR;
+      }
+      break;
+
     case RmdCAN_commands::motion:
-      // this->Delay(1);
+      this->Delay(1);
       if (cmd.type == CMDtype::setat) {
         // Combine the two int64_t values into one uint64_t value
         this->motionBuffer = static_cast<uint64_t>(((uint64_t)cmd.val) | ((uint64_t)(cmd.adr << 32)));
         executeMotionPlan(motionBuffer);
-        this->Delay(5);
-        motorOff();
       } else if (cmd.type == CMDtype::get) {
         replies.emplace_back((uint64_t)this->motionBuffer);
       } else {
@@ -752,9 +761,7 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(lastAng - angOffset);
       } else if (cmd.type == CMDtype::set) {
-        // this->moveToPosition(cmd.val);
-        // this->Delay(750);
-        // sendCmd(RmdCmd::motor_shutdown);
+        moveToPosition(cmd.val);
       }
       break;
 
@@ -838,6 +845,17 @@ void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t index) {
   buffer[(index)++] = number >> 8;
   buffer[(index)++] = number >> 16;
   buffer[(index)++] = number >> 24;
+}
+
+void buffer_append_uint64(uint8_t *buffer, uint64_t number) {
+  buffer[0] = number >> 56;
+  buffer[1] = number >> 48;
+  buffer[2] = number >> 40;
+  buffer[3] = number >> 32;
+  buffer[4] = number >> 24;
+  buffer[5] = number >> 16;
+  buffer[6] = number >> 8;
+  buffer[7] = number;
 }
 
 uint8_t buffer_get_uint8(const uint8_t *buffer, int32_t index) {

@@ -155,6 +155,7 @@ enum class RmdCAN_commands : uint32_t {
   stop,
   pid,
   motion,
+  brake,
   abspos,
   incpos,
   spd,
@@ -331,6 +332,7 @@ class RmdCAN2 : public RmdCAN {
 float normalize(float input, float min, float max);
 void buffer_append_float32(uint8_t *buffer, float number, float scale, int32_t index);
 
+void buffer_append_uint64(uint8_t *buffer, uint64_t number);
 void buffer_append_int32(uint8_t *buffer, int32_t number, int32_t index);
 void buffer_append_int16(uint8_t *buffer, int16_t number, int32_t index);
 void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t index);
