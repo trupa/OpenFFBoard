@@ -214,7 +214,6 @@ class RmdCAN : public MotorDriver,
 
   void suspendAxis(bool flag);
   bool isSuspended();
-  void getPosOffset();
 
   void sendCmd(RmdCmd cmd);
   void sendFunctionCmd(RmdFunctionControl fnc);

@@ -385,13 +385,6 @@ Encoder *RmdCAN::getEncoder() { return static_cast<Encoder *>(this); }
 
 EncoderType RmdCAN::getEncoderType() { return EncoderType::absolute; }
 
-void RmdCAN::getPosOffset() {
-  // Only change encoder count internally as offset
-  // if(this->connected)
-  // sendCmd(RmdCmd::read_zero_offset);
-  // posOffset = lastPos - ((float)pos / (float)getCpr());
-}
-
 void RmdCAN::setPos(int32_t pos) {
   // Only change encoder count internally as offset
   posOffset = lastPos;
@@ -441,7 +434,7 @@ void RmdCAN::setTorque(float torque) {
 void RmdCAN::moveToPosition(float posDegrees) {
   uint8_t buffer[8] = {0};
   buffer[0]         = (uint8_t)RmdCmd::abs_pos_control;  // 0xA4
-  uint16_t maxspd   = 100;
+  uint16_t maxspd   = 750;
   buffer_append_uint16(buffer, maxspd, 2);
   /* posDegrees is assumed to be in deg,
   and precision is 0.01 deg/LSB */
