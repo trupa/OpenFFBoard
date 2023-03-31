@@ -256,6 +256,7 @@ class RmdCAN : public MotorDriver,
   int32_t angOffset = 0; /* deg */
 
   int16_t currentTorque = 0;
+  int16_t currentSpeed = 0;
 
   CANPort *port   = &canport;
   float lastPos   = 0; /* turns */

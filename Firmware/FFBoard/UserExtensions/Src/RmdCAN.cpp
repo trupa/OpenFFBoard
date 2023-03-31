@@ -308,6 +308,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
     case RmdCmd::torque_control:  // 0xA1
     {
       this->currentTorque = buffer_get_int16(rxBuf, 2);
+      this->currentSpeed = buffer_get_int16(rxBuf, 4);
       break;
     }
 
@@ -400,7 +401,7 @@ void RmdCAN::setPos(int32_t pos) {
 float RmdCAN::getPos_f() {
   if (motorReady() && (!posWaiting || HAL_GetTick() - lastPosTime > 5)) {
     posWaiting = true;
-    // this->Delay(1);
+    this->Delay(1);
     sendCmd(RmdCmd::read_multiturn_position);
   }
   return lastPos - posOffset;
@@ -416,7 +417,7 @@ uint32_t RmdCAN::getCpr() { return 16384; }
  */
 void RmdCAN::turn(int16_t power) {
   float torque = ((float)power / (float)0x7FFF) * maxTorque;  // 0x7FFF is the int16_t max.
-  // this->Delay(1);
+  this->Delay(1);
   this->setTorque(torque);  // Send the signed torque(max of 1.0, min of -1.0)
 }
 
@@ -784,8 +785,9 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       break;
 
     case RmdCAN_commands::spd:
+      this->Delay(1);
       if (cmd.type == CMDtype::get) {
-        replies.emplace_back(this->lastSpeed);
+        replies.emplace_back(this->currentSpeed);
       } else if (cmd.type == CMDtype::set) {
         if (motorReady()) {
           uint8_t buffer[8] = {0};
