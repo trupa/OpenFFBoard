@@ -10,6 +10,7 @@
 #include "target_constants.h"
 #ifdef RMD
 #include <RmdCAN.h>
+#include <math.h>
 
 #define PI_F 3.14159265f
 
@@ -104,7 +105,7 @@ void RmdCAN::registerCommands() {
   registerCommand("multi_ang", RmdCAN_commands::multi_ang, "Rmd read multi-turn angle command", CMDFLAG_GET);
   registerCommand("pos_turns", RmdCAN_commands::pos_turns, "Rmd multi-turn relative position (turns)", CMDFLAG_GET);
   registerCommand("pos_turns_offset", RmdCAN_commands::pos_turns_offset, "Get the internally stored offset (turns)",
-                  CMDFLAG_GET);
+                  CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("multi_pos_raw", RmdCAN_commands::multi_pos_raw, "Rmd multi-turn raw position (pulses)", CMDFLAG_GET);
   registerCommand("multi_offset", RmdCAN_commands::multi_offset, "Rmd multi-turn zero offset (pulses)",
                   CMDFLAG_GET | CMDFLAG_SET);
@@ -119,7 +120,6 @@ void RmdCAN::registerCommands() {
   registerCommand("ipos", RmdCAN_commands::incpos, "Rmd inc position (deg) control command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("spd", RmdCAN_commands::spd, "Rmd speed closed loop command", CMDFLAG_GET | CMDFLAG_SET);
   registerCommand("torque", RmdCAN_commands::torque, "Rmd current torque (A)", CMDFLAG_GET);
-
   registerCommand("debug", RmdCAN_commands::debug, "debugging_data", CMDFLAG_GET);
 }
 
@@ -280,8 +280,8 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
     {
       this->multiturnEncPos = buffer_get_int32(rxBuf, 4);
       float epos            = static_cast<float>(multiturnEncPos);
-      float cpr             = getCpr();
-      this->lastPos         = static_cast<float>(epos / cpr);
+      float cpr             = static_cast<float>(getCpr());
+      this->lastPos         = fractional(epos / cpr);
       this->lastPosTime     = HAL_GetTick();
       this->posWaiting      = false;
       break;
@@ -401,7 +401,7 @@ float RmdCAN::getPos_f() {
 }
 
 int32_t RmdCAN::getPos() { return getPos_f() * getCpr(); }
-uint32_t RmdCAN::getCpr() { return 16384; }
+inline uint32_t RmdCAN::getCpr() { return 16384; }
 
 /**
  * Turn the motor with positive/negative power.
@@ -430,7 +430,6 @@ void RmdCAN::setTorque(float torque) {
   }
 }
 
-//
 void RmdCAN::moveToPosition(float posDegrees) {
   uint8_t buffer[8] = {0};
   buffer[0]         = (uint8_t)RmdCmd::abs_pos_control;  // 0xA4
@@ -736,6 +735,8 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
       this->Delay(1);
       if (cmd.type == CMDtype::get) {
         replies.emplace_back(posOffset * 10000);
+      } else if (cmd.type == CMDtype::set) {
+        setPos(0);
       } else {
         return CommandStatus::ERR;
       }
@@ -808,6 +809,16 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
   }
 
   return CommandStatus::OK;
+}
+
+inline float clamp(float x, float upper, float lower)
+{
+    return std::min(upper, std::max(x, lower));
+}
+
+inline float fractional(float x)
+{
+  return std::modf(x, nullptr);
 }
 
 float normalize(float input, float min, float max) {

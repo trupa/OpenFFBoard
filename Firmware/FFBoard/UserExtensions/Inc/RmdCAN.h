@@ -329,6 +329,8 @@ class RmdCAN2 : public RmdCAN {
 };
 
 /*                ***** Helper Functions *****                */
+float fractional(float input);
+float clamp(float input, float max, float min);
 float normalize(float input, float min, float max);
 void buffer_append_float32(uint8_t *buffer, float number, float scale, int32_t index);
 
