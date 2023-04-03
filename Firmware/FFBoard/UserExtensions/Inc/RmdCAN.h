@@ -26,7 +26,6 @@
 uint64_t ByteArrayToInt(const uint8_t *buffer, int length);
 void IntToByteArray(const uint64_t value, uint8_t *buffer, int length);
 struct RmdPIDSettings {
-
   // Conversion to uint64_t
   explicit operator uint64_t() {
     uint8_t buffer[6] = {0};
@@ -41,7 +40,7 @@ struct RmdPIDSettings {
   }
 
   RmdPIDSettings() = default;
-   // Converting ctor from uint64_t
+  // Converting ctor from uint64_t
   RmdPIDSettings(uint64_t val) {
     uint8_t buffer[6] = {0};
     IntToByteArray(val, buffer, 6);
@@ -168,6 +167,9 @@ struct RmdFlashAddrs {
   uint16_t canId     = ADR_RMD_CANID_M0;
   uint16_t maxTorque = ADR_RMD_MAXTORQUE_M0;
   uint16_t offset    = ADR_RMD_OFFSET_M0;
+  uint16_t pid0      = ADR_RMD_PID_0_M0;
+  uint16_t pid1      = ADR_RMD_PID_1_M0;
+  uint16_t pid2      = ADR_RMD_PID_2_M0;
 };
 
 // DEBUG START
@@ -255,7 +257,7 @@ class RmdCAN : public MotorDriver,
   int32_t angOffset = 0; /* deg */
 
   int16_t currentTorque = 0;
-  int16_t currentSpeed = 0;
+  int16_t currentSpeed  = 0;
 
   CANPort *port   = &canport;
   float lastPos   = 0; /* turns */

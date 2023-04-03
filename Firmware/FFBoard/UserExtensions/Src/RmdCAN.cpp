@@ -82,9 +82,11 @@ void RmdCAN::setCanFilter() {
 
 void RmdCAN::setAddress(uint8_t id) {
   if (id == 0) {
-    this->flashAddrs = RmdFlashAddrs({ADR_RMD_CANID_M0, ADR_RMD_MAXTORQUE_M0, ADR_RMD_OFFSET_M0});
+    this->flashAddrs = RmdFlashAddrs({ADR_RMD_CANID_M0, ADR_RMD_MAXTORQUE_M0, ADR_RMD_OFFSET_M0, ADR_RMD_PID_0_M0,
+                                      ADR_RMD_PID_1_M0, ADR_RMD_PID_2_M0});
   } else if (id == 1) {
-    this->flashAddrs = RmdFlashAddrs({ADR_RMD_CANID_M1, ADR_RMD_MAXTORQUE_M1, ADR_RMD_OFFSET_M1});
+    this->flashAddrs = RmdFlashAddrs({ADR_RMD_CANID_M1, ADR_RMD_MAXTORQUE_M1, ADR_RMD_OFFSET_M1, ADR_RMD_PID_0_M1,
+                                      ADR_RMD_PID_1_M1, ADR_RMD_PID_2_M1});
   }
 }
 
@@ -137,6 +139,19 @@ void RmdCAN::restoreFlash() {
   if (Flash_Read(flashAddrs.offset, &dataFlash)) {
     this->posOffset = (float)((int16_t)dataFlash / 10000.0);
   }
+
+  if (Flash_Read(flashAddrs.pid0, &dataFlash)) {
+    this->pidSettings.CurrentKp = dataFlash & 0xFF;
+    this->pidSettings.CurrentKi = (dataFlash >> 8) & 0xFF;
+  }
+  if (Flash_Read(flashAddrs.pid1, &dataFlash)) {
+    this->pidSettings.SpeedKp = dataFlash & 0xFF;
+    this->pidSettings.SpeedKi = (dataFlash >> 8) & 0xFF;
+  }
+  if (Flash_Read(flashAddrs.pid2, &dataFlash)) {
+    this->pidSettings.PositionKp = dataFlash & 0xFF;
+    this->pidSettings.PositionKi = (dataFlash >> 8) & 0xFF;
+  }
 }
 
 void RmdCAN::saveFlash() {
@@ -148,6 +163,15 @@ void RmdCAN::saveFlash() {
 
   uint16_t offset = ((int16_t)(this->posOffset * 10000) & 0xFFFF);
   Flash_Write(flashAddrs.offset, offset);
+
+  uint16_t params = this->pidSettings.CurrentKp | ((uint16_t)this->pidSettings.CurrentKi << 8);
+  Flash_Write(flashAddrs.pid0, params);
+
+  params = this->pidSettings.SpeedKp | ((uint16_t)this->pidSettings.SpeedKi << 8);
+  Flash_Write(flashAddrs.pid1, params);
+
+  params = this->pidSettings.PositionKp | ((uint16_t)this->pidSettings.PositionKi << 8);
+  Flash_Write(flashAddrs.pid2, params);
 }
 
 void RmdCAN::Run() {
@@ -283,10 +307,10 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
       float cpr             = static_cast<float>(getCpr());
       float curPos          = fractional(epos / cpr);
       // Need to check for noisy reporting. If the delta is greater than half a turn during the period,
-      // consider it an error and return the last position instead. 
-      this->lastPos         = (abs(curPos - lastPos) > 0.5f) ? lastPos : curPos;
-      this->lastPosTime     = HAL_GetTick();
-      this->posWaiting      = false;
+      // consider it an error and return the last position instead.
+      this->lastPos     = (abs(curPos - lastPos) > 0.5f) ? lastPos : curPos;
+      this->lastPosTime = HAL_GetTick();
+      this->posWaiting  = false;
       break;
     }
 

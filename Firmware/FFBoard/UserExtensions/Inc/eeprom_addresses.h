@@ -12,11 +12,11 @@
 
 #include "main.h"
 // Change this to the amount of currently registered variables
-#define NB_OF_VAR 153
+#define NB_OF_VAR 159
 extern const uint16_t VirtAddVarTab[NB_OF_VAR];
 
 // Amount of variables in exportable list
-#define NB_EXPORTABLE_ADR 132
+#define NB_EXPORTABLE_ADR 138
 extern const uint16_t exportableFlashAddresses[NB_EXPORTABLE_ADR];
 
 
@@ -178,9 +178,15 @@ uint16_t EE_ReadVariable(uint16_t VirtAddress, uint16_t* Data) will return 1 if 
 #define ADR_RMD_CANID_M0 0x3F0 //0-6 ID M0, 7-12 ID M1, 13-15 can speed
 #define ADR_RMD_MAXTORQUE_M0 0x3F1
 #define ADR_RMD_OFFSET_M0 0x3F2 //16b offset
-#define ADR_RMD_CANID_M1 0x3F3 //0-6 ID M0, 7-12 ID M1, 13-15 can speed
-#define ADR_RMD_MAXTORQUE_M1 0x3F4
-#define ADR_RMD_OFFSET_M1 0x3F5 //16b offset
+#define ADR_RMD_PID_0_M0 0x3F3
+#define ADR_RMD_PID_1_M0 0x3F4
+#define ADR_RMD_PID_2_M0 0x3F5
+#define ADR_RMD_CANID_M1 0x3F6 //0-6 ID M0, 7-12 ID M1, 13-15 can speed
+#define ADR_RMD_MAXTORQUE_M1 0x3F7
+#define ADR_RMD_OFFSET_M1 0x3F8 //16b offset
+#define ADR_RMD_PID_0_M1 0x3F9
+#define ADR_RMD_PID_1_M1 0x3FA
+#define ADR_RMD_PID_2_M1 0x3FB
 //MT Encoder
 #define ADR_MTENC_OFS 0x400
 #define ADR_MTENC_CONF1 0x401

@@ -284,7 +284,8 @@ void Axis::prepareForUpdate(){
 
 	// checkSuspendUpdate();
 #ifdef RMD
-	if (!drv->motorReady()) return;
+	RmdCAN *drv = dynamic_cast<RmdCAN *>(this->drv.get());
+	if (drv != nullptr && !drv->motorReady()) return;
 #endif
 	//if (!drv->motorReady()) return;
 
