@@ -281,7 +281,10 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
       this->multiturnEncPos = buffer_get_int32(rxBuf, 4);
       float epos            = static_cast<float>(multiturnEncPos);
       float cpr             = static_cast<float>(getCpr());
-      this->lastPos         = fractional(epos / cpr);
+      float curPos          = fractional(epos / cpr);
+      // Need to check for noisy reporting. If the delta is greater than half a turn during the period,
+      // consider it an error and return the last position instead. 
+      this->lastPos         = (abs(curPos - lastPos) > 0.5f) ? lastPos : curPos;
       this->lastPosTime     = HAL_GetTick();
       this->posWaiting      = false;
       break;
@@ -308,7 +311,7 @@ void RmdCAN::canRxPendCallback(CAN_HandleTypeDef *hcan, uint8_t *rxBuf, CAN_RxHe
     case RmdCmd::torque_control:  // 0xA1
     {
       this->currentTorque = buffer_get_int16(rxBuf, 2);
-      this->currentSpeed = buffer_get_int16(rxBuf, 4);
+      this->currentSpeed  = buffer_get_int16(rxBuf, 4);
       break;
     }
 
@@ -811,15 +814,9 @@ CommandStatus RmdCAN::command(const ParsedCommand &cmd, std::vector<CommandReply
   return CommandStatus::OK;
 }
 
-inline float clamp(float x, float upper, float lower)
-{
-    return std::min(upper, std::max(x, lower));
-}
+inline float clamp(float x, float upper, float lower) { return std::min(upper, std::max(x, lower)); }
 
-inline float fractional(float x)
-{
-  return std::modf(x, nullptr);
-}
+inline float fractional(float x) { return std::modf(x, nullptr); }
 
 float normalize(float input, float min, float max) {
   float average      = (min + max) / 2;
