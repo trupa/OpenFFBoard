@@ -191,6 +191,7 @@ void RmdCAN::Run() {
         break;
 
       case RmdLocalState::WAIT_READY:
+		state = RmdLocalState::START_RUNNING;
         break;
 
       case RmdLocalState::START_RUNNING:
@@ -428,7 +429,7 @@ float RmdCAN::getPos_f() {
 }
 
 int32_t RmdCAN::getPos() { return getPos_f() * getCpr(); }
-inline uint32_t RmdCAN::getCpr() { return 16384; }
+inline uint32_t RmdCAN::getCpr() { return 262144; }
 
 /**
  * Turn the motor with positive/negative power.
